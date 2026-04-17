@@ -253,39 +253,117 @@ function AddStockForm({ onAdd }) {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const mockHoldings = [
-    { symbol: 'AAPL', shares: 10, avgPrice: 180 },
-    { symbol: 'TEVA.TA', shares: 50, avgPrice: 85 },
-  ]
-  const mockPrices = {
-    AAPL: { regularMarketPrice: 190, regularMarketChangePercent: 1.2, longName: 'Apple Inc.' },
-    'TEVA.TA': { regularMarketPrice: 91, regularMarketChangePercent: -0.8, longName: 'Teva Pharmaceutical' },
+  const [holdings, setHoldings] = useState(() => loadHoldings())
+  const [prices, setPrices] = useState(() => loadPricesCache() ?? {})
+  const [exchangeRate, setExchangeRate] = useState(3.7)
+  const [loading, setLoading] = useState(false)
+  const [stale, setStale] = useState(false)
+  const [totalCurrency, setTotalCurrency] = useState('USD')
+
+  const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
+
+  const refresh = useCallback(async () => {
+    if (!holdings.length) return
+    setLoading(true)
+    setStale(false)
+    try {
+      const symbols = holdings.map((h) => h.symbol)
+      const { priceMap, exchangeRate: rate } = await fetchPrices(symbols, apiKey)
+      setPrices(priceMap)
+      setExchangeRate(rate)
+      savePricesCache(priceMap)
+    } catch (err) {
+      console.error('Price fetch failed:', err)
+      setStale(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [holdings, apiKey])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  const handleAdd = (holding) => {
+    const exists = holdings.find((h) => h.symbol === holding.symbol)
+    if (exists) return
+    const updated = [...holdings, holding]
+    setHoldings(updated)
+    saveHoldings(updated)
   }
-  const [currency, setCurrency] = useState('USD')
+
+  const handleDelete = (symbol) => {
+    const updated = holdings.filter((h) => h.symbol !== symbol)
+    setHoldings(updated)
+    saveHoldings(updated)
+    setPrices((prev) => {
+      const next = { ...prev }
+      delete next[symbol]
+      return next
+    })
+  }
+
+  const toggleCurrency = () => {
+    setTotalCurrency((c) => (c === 'USD' ? 'ILS' : 'USD'))
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="max-w-md mx-auto px-4 pb-10">
+
         <div className="flex items-center justify-between py-4">
           <h1 className="gradient-text text-2xl font-black">MyStock</h1>
-          <button className="w-9 h-9 flex items-center justify-center bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-300">
-            <RefreshCw size={15} />
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="w-9 h-9 flex items-center justify-center bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-300 disabled:opacity-40 transition-opacity"
+            aria-label="Refresh prices"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
+
+        {stale && (
+          <div className="mb-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2">
+            ⚠ Could not fetch live prices — showing cached data.
+          </div>
+        )}
+
         <PortfolioHeader
-          holdings={mockHoldings}
-          prices={mockPrices}
-          exchangeRate={3.7}
-          totalCurrency={currency}
-          onToggleCurrency={() => setCurrency(c => c === 'USD' ? 'ILS' : 'USD')}
+          holdings={holdings}
+          prices={prices}
+          exchangeRate={exchangeRate}
+          totalCurrency={totalCurrency}
+          onToggleCurrency={toggleCurrency}
         />
-        <div className="mt-4 space-y-2">
-          {mockHoldings.map(h => (
-            <StockCard key={h.symbol} holding={h} priceData={mockPrices[h.symbol]} onDelete={() => {}} />
-          ))}
-        </div>
-        <div className="my-4 h-px bg-white/5" />
-        <AddStockForm onAdd={(h) => console.log('add', h)} />
+
+        {holdings.length > 0 && (
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-[11px] text-slate-500 uppercase tracking-widest font-semibold">
+                My Holdings
+              </p>
+              <p className="text-[10px] text-slate-600">{holdings.length} stock{holdings.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div className="space-y-2">
+              {holdings.map((h) => (
+                <StockCard
+                  key={h.symbol}
+                  holding={h}
+                  priceData={prices[h.symbol] ?? null}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {holdings.length > 0 && (
+          <div className="my-4 h-px bg-white/5" />
+        )}
+
+        <AddStockForm onAdd={handleAdd} />
+
       </div>
     </div>
   )
