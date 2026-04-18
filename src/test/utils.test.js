@@ -7,6 +7,7 @@ import {
   saveHoldings,
   loadPricesCache,
   savePricesCache,
+  calculateHoldingMetrics,
 } from '../utils'
 
 describe('isILStock', () => {
@@ -108,5 +109,61 @@ describe('LocalStorage helpers', () => {
     const cache = { AAPL: { regularMarketPrice: 190 } }
     savePricesCache(cache)
     expect(loadPricesCache()).toEqual(cache)
+  })
+})
+
+describe('calculateHoldingMetrics', () => {
+  const baseHolding = {
+    symbol: 'AAPL',
+    shares: 10,
+    purchasePrice: 150,
+    fees: 5,
+    dividends: 20,
+    purchaseDate: '2024-01-01',
+  }
+
+  it('calculates adjustedCostBasis as (purchasePrice * shares) + fees', () => {
+    const result = calculateHoldingMetrics(baseHolding, 190)
+    expect(result.adjustedCostBasis).toBeCloseTo(1505)
+  })
+
+  it('calculates currentValue as currentPrice * shares', () => {
+    const result = calculateHoldingMetrics(baseHolding, 190)
+    expect(result.currentValue).toBeCloseTo(1900)
+  })
+
+  it('calculates totalReturn as currentValue + dividends - adjustedCostBasis', () => {
+    const result = calculateHoldingMetrics(baseHolding, 190)
+    expect(result.totalReturn).toBeCloseTo(415)
+  })
+
+  it('calculates roiPct as (totalReturn / adjustedCostBasis) * 100', () => {
+    const result = calculateHoldingMetrics(baseHolding, 190)
+    expect(result.roiPct).toBeCloseTo(415 / 1505 * 100, 1)
+  })
+
+  it('calculates breakEven as (adjustedCostBasis - dividends) / shares', () => {
+    const result = calculateHoldingMetrics(baseHolding, 190)
+    expect(result.breakEven).toBeCloseTo(148.5)
+  })
+
+  it('divides both currentPrice and purchasePrice by 100 for .TA stocks', () => {
+    const taseHolding = { ...baseHolding, symbol: 'ELBT.TA', purchasePrice: 15000 }
+    const result = calculateHoldingMetrics(taseHolding, 19000)
+    expect(result.adjustedCostBasis).toBeCloseTo(1505)
+    expect(result.currentValue).toBeCloseTo(1900)
+  })
+
+  it('returns roiPct = 0 when adjustedCostBasis is 0', () => {
+    const zeroCost = { ...baseHolding, purchasePrice: 0, fees: 0, dividends: 0 }
+    const result = calculateHoldingMetrics(zeroCost, 190)
+    expect(result.roiPct).toBe(0)
+  })
+
+  it('defaults fees and dividends to 0 if missing', () => {
+    const minimal = { symbol: 'AAPL', shares: 10, purchasePrice: 150 }
+    const result = calculateHoldingMetrics(minimal, 190)
+    expect(result.adjustedCostBasis).toBeCloseTo(1500)
+    expect(result.totalReturn).toBeCloseTo(400)
   })
 })

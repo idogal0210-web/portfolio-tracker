@@ -65,3 +65,21 @@ export const loadPricesCache = () => {
 export const savePricesCache = (prices) => {
   localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices))
 }
+
+export function calculateHoldingMetrics(holding, currentApiPrice) {
+  const isTASE = isILStock(holding.symbol)
+  const effectiveCurrentPrice = isTASE ? currentApiPrice / 100 : currentApiPrice
+  const effectivePurchasePrice = isTASE ? (holding.purchasePrice || 0) / 100 : (holding.purchasePrice || 0)
+
+  const fees = holding.fees || 0
+  const dividends = holding.dividends || 0
+  const shares = holding.shares || 0
+
+  const adjustedCostBasis = effectivePurchasePrice * shares + fees
+  const currentValue = effectiveCurrentPrice * shares
+  const totalReturn = currentValue + dividends - adjustedCostBasis
+  const roiPct = adjustedCostBasis > 0 ? (totalReturn / adjustedCostBasis) * 100 : 0
+  const breakEven = shares > 0 ? (adjustedCostBasis - dividends) / shares : 0
+
+  return { adjustedCostBasis, currentValue, totalReturn, roiPct, breakEven, effectiveCurrentPrice }
+}
