@@ -43,7 +43,7 @@ const PRICES_CACHE_KEY = 'mystock_prices_cache'
 
 export const loadHoldings = () => {
   try {
-    const raw = localStorage.getItem('mystock_holdings')
+    const raw = localStorage.getItem(HOLDINGS_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     return parsed.map(h => ({

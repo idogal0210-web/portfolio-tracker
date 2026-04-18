@@ -170,7 +170,7 @@ function AddStockForm({ onAdd }) {
       purchasePrice: price,
       fees: feesVal,
       dividends: divsVal,
-      purchaseDate: purchaseDate || '',
+      purchaseDate,
     })
     setSymbol('')
     setShares('')
@@ -199,12 +199,13 @@ function AddStockForm({ onAdd }) {
           <label className="block text-xs text-slate-400 mb-1">Quantity</label>
           <input
             type="number"
-            min="0"
+            min="0.0001"
             step="any"
             className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             placeholder="10.5"
             value={shares}
             onChange={e => setShares(e.target.value)}
+            inputMode="decimal"
           />
         </div>
       </div>
@@ -219,13 +220,17 @@ function AddStockForm({ onAdd }) {
             min="0"
             step="any"
             className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-            placeholder={isTASE ? 'e.g. 15000 ag' : 'e.g. 150.00'}
+            placeholder={isTASE ? 'e.g. 15000 (agorot)' : 'e.g. 150.00'}
             value={purchasePrice}
             onChange={e => setPurchasePrice(e.target.value)}
+            inputMode="decimal"
           />
+          {isTASE && <p className="text-xs text-slate-500 mt-1">100 agorot = ₪1</p>}
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Fees (total)</label>
+          <label className="block text-xs text-slate-400 mb-1">
+            Fees {isTASE ? '(ILS)' : '(USD)'}
+          </label>
           <input
             type="number"
             min="0"
@@ -234,6 +239,7 @@ function AddStockForm({ onAdd }) {
             placeholder="0.00"
             value={fees}
             onChange={e => setFees(e.target.value)}
+            inputMode="decimal"
           />
         </div>
       </div>
@@ -249,6 +255,7 @@ function AddStockForm({ onAdd }) {
             placeholder="0.00"
             value={dividends}
             onChange={e => setDividends(e.target.value)}
+            inputMode="decimal"
           />
         </div>
         <div>
