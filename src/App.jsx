@@ -1,64 +1,93 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
-import { isILStock, formatCurrency, calculateTotals, loadHoldings, saveHoldings, loadPricesCache, savePricesCache } from './utils'
+import { RefreshCw } from 'lucide-react'
+import { isILStock, formatCurrency, calculateTotals, loadHoldings, saveHoldings, loadPricesCache, savePricesCache, calculateHoldingMetrics } from './utils'
 import { fetchPrices } from './api'
 
 // ─── StockCard ────────────────────────────────────────────────────────────────
-function StockCard({ holding, priceData, onDelete }) {
-  const il = isILStock(holding.symbol)
-  const currency = il ? 'ILS' : 'USD'
-  const ticker = holding.symbol.replace('.TA', '').replace('.ta', '')
+function StockCard({ holding, price, onDelete }) {
+  const { symbol, shares, purchaseDate } = holding
+  const isIL = isILStock(symbol)
+  const currency = isIL ? 'ILS' : 'USD'
 
-  const price = priceData?.regularMarketPrice ?? null
-  const changePct = priceData?.regularMarketChangePercent ?? null
-  const companyName = priceData?.longName ?? holding.symbol
-  const totalValue = price !== null ? holding.shares * price : null
-  const isUp = changePct !== null && changePct >= 0
+  const currentApiPrice = price?.regularMarketPrice ?? 0
+  const changePercent = price?.regularMarketChangePercent ?? 0
+  const companyName = price?.longName ?? symbol
+
+  const metrics = price ? calculateHoldingMetrics(holding, currentApiPrice) : null
+
+  const displayPrice = metrics ? formatCurrency(metrics.effectiveCurrentPrice, currency) : '—'
+  const displayValue = metrics ? formatCurrency(metrics.currentValue, currency) : '—'
+  const displayCostBasis = metrics ? formatCurrency(metrics.adjustedCostBasis, currency) : '—'
+  const displayReturn = metrics ? formatCurrency(Math.abs(metrics.totalReturn), currency) : '—'
+  const displayBreakEven = metrics ? formatCurrency(metrics.breakEven, currency) : '—'
+
+  const roiPct = metrics?.roiPct ?? 0
+  const totalReturn = metrics?.totalReturn ?? 0
+  const isPositive = totalReturn >= 0
+  const isDayPositive = changePercent >= 0
 
   return (
-    <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-xl flex items-center justify-center text-[9px] font-black tracking-tight ${
-            il
-              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-              : 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-300'
-          }`}
-        >
-          {ticker.length > 4 ? ticker.slice(0, 4) : ticker}
-        </div>
-        <div>
-          <div className="text-sm font-bold text-slate-100 leading-tight">
-            {companyName.length > 22 ? companyName.slice(0, 22) + '…' : companyName}
-            {il && <span className="ml-1 text-[10px]">🇮🇱</span>}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">
-            {holding.shares} shares
-            {price !== null && ` · ${il ? '₪' : '$'}${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <div className="text-right">
-          <div className="text-sm font-bold text-slate-100">
-            {totalValue !== null ? formatCurrency(totalValue, currency) : '—'}
-          </div>
-          {changePct !== null && (
-            <div className={`text-[10px] font-semibold flex items-center justify-end gap-0.5 ${isUp ? 'text-green-400' : 'text-red-400'}`}>
-              {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-              {isUp ? '+' : ''}{changePct.toFixed(2)}%
-            </div>
-          )}
+    <div className="glass rounded-2xl p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${isIL ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+            {symbol}
+          </span>
+          <span className="text-sm text-slate-300 truncate">{companyName}</span>
         </div>
         <button
-          onClick={() => onDelete(holding.symbol)}
-          className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-          aria-label={`Remove ${holding.symbol}`}
+          onClick={() => onDelete(symbol)}
+          className="text-slate-500 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
+          aria-label="Remove holding"
         >
-          <Trash2 size={14} />
+          ×
         </button>
       </div>
+
+      {/* Price + daily change */}
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-white font-semibold">{displayPrice}</span>
+        <span className={`font-medium ${isDayPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          {isDayPositive ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}% today
+        </span>
+      </div>
+
+      {/* Shares + date */}
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <span>{shares} shares</span>
+        {purchaseDate && <span>Since {purchaseDate}</span>}
+      </div>
+
+      {/* Metrics grid */}
+      {metrics && (
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50">
+          <div>
+            <p className="text-xs text-slate-500">Cost Basis</p>
+            <p className="text-sm text-slate-200">{displayCostBasis}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Current Value</p>
+            <p className="text-sm text-slate-200">{displayValue}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Total Return</p>
+            <p className={`text-sm font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+              {isPositive ? '+' : '-'}{displayReturn}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">ROI</p>
+            <p className={`text-sm font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+              {isPositive ? '+' : ''}{roiPct.toFixed(2)}%
+            </p>
+          </div>
+          <div className="col-span-2">
+            <p className="text-xs text-slate-500">Break-even Price</p>
+            <p className="text-sm text-slate-200">{displayBreakEven}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -378,7 +407,7 @@ export default function App() {
                 <StockCard
                   key={h.symbol}
                   holding={h}
-                  priceData={prices[h.symbol] ?? null}
+                  price={prices[h.symbol] ?? null}
                   onDelete={handleDelete}
                 />
               ))}
