@@ -5,6 +5,7 @@ import { fetchPrices } from './api'
 
 // ─── StockCard ────────────────────────────────────────────────────────────────
 function StockCard({ holding, price, onDelete }) {
+  if (!holding) return null
   const { symbol, shares, purchaseDate } = holding
   const isIL = isILStock(symbol)
   const currency = isIL ? 'ILS' : 'USD'
@@ -24,7 +25,8 @@ function StockCard({ holding, price, onDelete }) {
   const roiPct = metrics?.roiPct ?? 0
   const totalReturn = metrics?.totalReturn ?? 0
   const isPositive = totalReturn >= 0
-  const isDayPositive = changePercent >= 0
+  const isDayPositive = changePercent > 0
+  const isDayNeutral = changePercent === 0
 
   return (
     <div className="glass rounded-2xl p-4 space-y-3">
@@ -39,7 +41,7 @@ function StockCard({ holding, price, onDelete }) {
         <button
           onClick={() => onDelete(symbol)}
           className="text-slate-500 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
-          aria-label="Remove holding"
+          aria-label={`Remove ${symbol} from portfolio`}
         >
           ×
         </button>
@@ -48,8 +50,8 @@ function StockCard({ holding, price, onDelete }) {
       {/* Price + daily change */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-white font-semibold">{displayPrice}</span>
-        <span className={`font-medium ${isDayPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-          {isDayPositive ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}% today
+        <span className={`font-medium ${isDayNeutral ? 'text-slate-400' : isDayPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          {isDayNeutral ? '=' : isDayPositive ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}% today
         </span>
       </div>
 
