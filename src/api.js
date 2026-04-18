@@ -1,4 +1,4 @@
-const API_HOST = 'yahoo-finance1.p.rapidapi.com'
+const API_HOST = 'apidojo-yahoo-finance-v1.p.rapidapi.com'
 const API_URL = `https://${API_HOST}/market/v2/get-quotes`
 
 export async function fetchPrices(symbols, apiKey) {
