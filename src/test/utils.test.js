@@ -93,7 +93,14 @@ describe('LocalStorage helpers', () => {
   it('saveHoldings + loadHoldings round-trips data', () => {
     const data = [{ symbol: 'AAPL', shares: 5, avgPrice: 150 }]
     saveHoldings(data)
-    expect(loadHoldings()).toEqual(data)
+    expect(loadHoldings()).toEqual([{
+      symbol: 'AAPL',
+      shares: 5,
+      purchasePrice: 150,
+      fees: 0,
+      dividends: 0,
+      purchaseDate: '',
+    }])
   })
 
   it('loadHoldings returns [] on corrupt JSON', () => {

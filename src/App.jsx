@@ -144,110 +144,131 @@ function PortfolioHeader({ holdings, prices, exchangeRate, totalCurrency, onTogg
 
 // ─── AddStockForm ─────────────────────────────────────────────────────────────
 function AddStockForm({ onAdd }) {
-  const [ticker, setTicker] = useState('')
+  const [symbol, setSymbol] = useState('')
   const [shares, setShares] = useState('')
-  const [avgPrice, setAvgPrice] = useState('')
+  const [purchasePrice, setPurchasePrice] = useState('')
+  const [fees, setFees] = useState('')
+  const [dividends, setDividends] = useState('')
+  const [purchaseDate, setPurchaseDate] = useState('')
   const [error, setError] = useState('')
 
-  const il = isILStock(ticker)
-  const trimmedTicker = ticker.trim().toUpperCase()
+  const isTASE = symbol.toUpperCase().endsWith('.TA')
 
-  const handleSubmit = (e) => {
+  function handleSubmit(e) {
     e.preventDefault()
+    const sym = symbol.trim().toUpperCase()
+    if (!sym) return setError('Ticker is required')
+    const qty = parseFloat(shares)
+    if (!qty || qty <= 0) return setError('Enter a valid quantity')
+    const price = parseFloat(purchasePrice) || 0
+    const feesVal = parseFloat(fees) || 0
+    const divsVal = parseFloat(dividends) || 0
     setError('')
-
-    if (!trimmedTicker) return setError('Enter a ticker symbol.')
-    if (!shares || Number(shares) <= 0) return setError('Enter a valid number of shares.')
-
     onAdd({
-      symbol: trimmedTicker,
-      shares: Number(shares),
-      avgPrice: avgPrice ? Number(avgPrice) : 0,
+      symbol: sym,
+      shares: qty,
+      purchasePrice: price,
+      fees: feesVal,
+      dividends: divsVal,
+      purchaseDate: purchaseDate || '',
     })
-
-    setTicker('')
+    setSymbol('')
     setShares('')
-    setAvgPrice('')
+    setPurchasePrice('')
+    setFees('')
+    setDividends('')
+    setPurchaseDate('')
   }
 
   return (
-    <div className="glass-form rounded-2xl p-4">
-      <p className="text-[11px] text-slate-500 uppercase tracking-widest font-semibold mb-3">
-        Add Stock
-      </p>
+    <form onSubmit={handleSubmit} className="glass-form rounded-2xl p-5 space-y-3">
+      <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Add Holding</h2>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">
-            Ticker Symbol
+          <label className="block text-xs text-slate-400 mb-1">Ticker</label>
+          <input
+            className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            placeholder="AAPL / ELBT.TA"
+            value={symbol}
+            onChange={e => setSymbol(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Quantity</label>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            placeholder="10.5"
+            value={shares}
+            onChange={e => setShares(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">
+            Purchase Price {isTASE ? '(Agurot)' : '(USD)'}
           </label>
           <input
-            type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            placeholder="AAPL or TEVA.TA"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50"
+            type="number"
+            min="0"
+            step="any"
+            className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            placeholder={isTASE ? 'e.g. 15000 ag' : 'e.g. 150.00'}
+            value={purchasePrice}
+            onChange={e => setPurchasePrice(e.target.value)}
           />
-          <p className="text-[10px] text-slate-600 mt-1">
-            Add <span className="text-slate-400">.TA</span> suffix for Tel Aviv stocks (e.g. TEVA.TA)
-          </p>
         </div>
-
-        {trimmedTicker.length >= 2 && (
-          <div
-            className={`text-[10px] px-3 py-2 rounded-lg border font-medium ${
-              il
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
-            }`}
-          >
-            {il ? '🇮🇱 Tel Aviv Stock Exchange — prices in ₪' : '🇺🇸 US Exchange — prices in $'}
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">
-              Shares
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={shares}
-              onChange={(e) => setShares(e.target.value)}
-              placeholder="100"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">
-              Avg. Price <span className="text-slate-600">(optional)</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={avgPrice}
-              onChange={(e) => setAvgPrice(e.target.value)}
-              placeholder={il ? '₪85' : '$150'}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50"
-            />
-          </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Fees (total)</label>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            placeholder="0.00"
+            value={fees}
+            onChange={e => setFees(e.target.value)}
+          />
         </div>
+      </div>
 
-        {error && (
-          <p className="text-[11px] text-red-400">{error}</p>
-        )}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Dividends / Staking</label>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            placeholder="0.00"
+            value={dividends}
+            onChange={e => setDividends(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Purchase Date</label>
+          <input
+            type="date"
+            className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            value={purchaseDate}
+            onChange={e => setPurchaseDate(e.target.value)}
+          />
+        </div>
+      </div>
 
-        <button
-          type="submit"
-          className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl text-sm font-bold text-white active:opacity-80 transition-opacity"
-        >
-          Add to Portfolio
-        </button>
-      </form>
-    </div>
+      <button
+        type="submit"
+        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg py-2 text-sm transition-colors"
+      >
+        Add Holding
+      </button>
+    </form>
   )
 }
 
