@@ -166,4 +166,11 @@ describe('calculateHoldingMetrics', () => {
     expect(result.adjustedCostBasis).toBeCloseTo(1500)
     expect(result.totalReturn).toBeCloseTo(400)
   })
+
+  test('returns zeros when shares is missing', () => {
+    const noShares = { symbol: 'AAPL', purchasePrice: 150 }
+    const result = calculateHoldingMetrics(noShares, 190)
+    expect(result.currentValue).toBe(0)
+    expect(result.adjustedCostBasis).toBe(0)
+  })
 })

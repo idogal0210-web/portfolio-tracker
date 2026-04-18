@@ -66,7 +66,8 @@ export const savePricesCache = (prices) => {
   localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices))
 }
 
-export function calculateHoldingMetrics(holding, currentApiPrice) {
+// Prices for .TA symbols must be passed in agorot (API convention); conversion to shekels is done internally.
+export const calculateHoldingMetrics = (holding, currentApiPrice) => {
   const isTASE = isILStock(holding.symbol)
   const effectiveCurrentPrice = isTASE ? currentApiPrice / 100 : currentApiPrice
   const effectivePurchasePrice = isTASE ? (holding.purchasePrice || 0) / 100 : (holding.purchasePrice || 0)
