@@ -1,10 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
-import {
-  TrendingUp, TrendingDown, RefreshCw, Wallet,
-  PieChart, Plus, History, LayoutGrid,
-  ArrowUpRight, UserCircle, Calendar,
-  DollarSign, Tag, Hash, Coins, Banknote
-} from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   isILStock, formatCurrency, calculateTotals,
   loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
@@ -12,148 +6,340 @@ import {
 } from './utils'
 import { fetchPrices } from './api'
 
-// ─── TabItem ──────────────────────────────────────────────────────────────────
-function TabItem({ icon, active = false }) {
+// ─── deterministic PRNG ───────────────────────────────────────────────────────
+function makeRand(seed) {
+  let s = seed
+  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280 }
+}
+
+function sparklinePoints(seed, n = 40) {
+  const rand = makeRand(seed)
+  const pts = []
+  let v = 100
+  for (let i = 0; i < n; i++) {
+    v += (rand() - 0.5) * 4
+    pts.push(v)
+  }
+  return pts
+}
+
+function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
+  const seed = symbol.charCodeAt(0) * 73 + symbol.length * 13
+  const rand = makeRand(seed)
+  const raw = []
+  let v = 1
+  for (let i = 0; i < days; i++) {
+    v += (rand() - 0.5) * 0.04
+    raw.push(v)
+  }
+  const lo = raw[0], hi = raw[raw.length - 1]
+  return raw.map(r => {
+    const t = (r - lo) / ((hi - lo) || 1)
+    return startPrice + t * (endPrice - startPrice)
+  })
+}
+
+// ─── logo ─────────────────────────────────────────────────────────────────────
+const LOGO_COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6']
+
+function generateLogo(ticker) {
+  const base = ticker.replace('.TA', '')
+  return { bg: LOGO_COLORS[base.charCodeAt(0) % LOGO_COLORS.length], char: base[0] }
+}
+
+// ─── SVG primitives ───────────────────────────────────────────────────────────
+function Logo({ ticker, size = 40 }) {
+  const { bg, char } = generateLogo(ticker)
   return (
-    <button className={`p-2 flex flex-col items-center gap-1 transition-all duration-300 ${active ? 'text-white' : 'text-white/20 hover:text-white/50'}`}>
-      {icon}
-      {active && <div className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_white]" />}
-    </button>
+    <div style={{ width: size, height: size, borderRadius: size / 2, background: bg, flexShrink: 0 }}
+      className="flex items-center justify-center font-bold text-white"
+      style={{ width: size, height: size, borderRadius: size / 2, background: bg, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: size * 0.42 }}>
+      {char}
+    </div>
   )
 }
 
-// ─── StockCard ────────────────────────────────────────────────────────────────
-function StockCard({ holding, price, onDelete }) {
-  if (!holding) return null
-  const { symbol, shares } = holding
-  const isIL = isILStock(symbol)
+function Sparkline({ data, color = '#22c55e', width = 52, height = 24 }) {
+  if (!data?.length) return <div style={{ width, height }} />
+  const min = Math.min(...data), max = Math.max(...data)
+  const range = max - min || 1
+  const pts = data.map((v, i) => [
+    (i / (data.length - 1)) * width,
+    height - ((v - min) / range) * height
+  ])
+  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
+  return (
+    <svg width={width} height={height} style={{ overflow: 'visible', flexShrink: 0 }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
+  if (!data?.length) return <div style={{ width, height }} />
+  const min = Math.min(...data), max = Math.max(...data)
+  const range = max - min || 1
+  const pad = 6
+  const pts = data.map((v, i) => [
+    (i / (data.length - 1)) * width,
+    pad + (1 - (v - min) / range) * (height - pad * 2)
+  ])
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1], [cx, cy] = pts[i]
+    const mx = (px + cx) / 2
+    d += ` Q${px.toFixed(1)} ${py.toFixed(1)} ${mx.toFixed(1)} ${((py + cy) / 2).toFixed(1)} T${cx.toFixed(1)} ${cy.toFixed(1)}`
+  }
+  const area = `${d} L${width} ${height} L0 ${height} Z`
+  const id = `pc${color.replace(/[^a-z0-9]/gi, '')}`
+  return (
+    <svg width={width} height={height} style={{ display: 'block' }}>
+      <defs>
+        <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${id})`} />
+      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function AllocationRing({ slices, size = 110, thickness = 12 }) {
+  const r = (size - thickness) / 2
+  const c = 2 * Math.PI * r
+  const total = slices.reduce((s, x) => s + x.value, 0) || 1
+  let offset = 0
+  return (
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={thickness} />
+      {slices.map((s, i) => {
+        const len = (s.value / total) * c
+        const el = (
+          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none"
+            stroke={s.color} strokeWidth={thickness}
+            strokeDasharray={`${len.toFixed(2)} ${(c - len).toFixed(2)}`}
+            strokeDashoffset={(-offset).toFixed(2)} />
+        )
+        offset += len
+        return el
+      })}
+    </svg>
+  )
+}
+
+// ─── market badge ─────────────────────────────────────────────────────────────
+function MarketBadge({ market }) {
+  const styles = {
+    IL: 'bg-blue-500/10 text-blue-400',
+    US: 'bg-white/5 text-white/40',
+  }
+  return (
+    <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${styles[market] ?? styles.US}`}>
+      {market}
+    </span>
+  )
+}
+
+// ─── HoldingRow ───────────────────────────────────────────────────────────────
+function HoldingRow({ h, onClick }) {
+  const isIL = h.market === 'IL'
   const currency = isIL ? 'ILS' : 'USD'
-
-  const currentApiPrice = price?.regularMarketPrice ?? 0
-  const companyName = price?.longName ?? symbol
-
-  const metrics = price ? calculateHoldingMetrics(holding, currentApiPrice) : null
-
-  const displayValue = metrics ? formatCurrency(metrics.currentValue, currency) : '—'
-  const roiPct = metrics?.roiPct ?? null
-  const isPositive = (roiPct ?? 0) >= 0
+  const metrics = h._metrics
+  const spark = useMemo(() => sparklinePoints(h.ticker.charCodeAt(0) * 7 + h.ticker.length * 3), [h.ticker])
+  const pl = metrics ? metrics.totalReturn : 0
+  const isUp = pl >= 0
+  const sparkColor = isUp ? '#22c55e' : '#ef4444'
+  const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <div className="glass-card-small p-5 flex flex-col justify-between min-h-[150px] active:scale-95 transition-transform relative">
-      <div>
-        <div className="flex justify-between items-start mb-3">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${isIL ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/10 border-white/10'}`}>
-            <span className="text-[10px] font-black">{symbol[0]}</span>
-          </div>
-          <button
-            onClick={() => onDelete(symbol)}
-            className="text-white/20 hover:text-red-400 transition-colors text-lg leading-none"
-            aria-label={`Remove ${symbol} from portfolio`}
-          >
-            ×
-          </button>
+    <div onClick={onClick}
+      className="flex items-center gap-3 px-4 py-3.5 rounded-2xl cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5">
+      <Logo ticker={h.ticker} size={42} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-white font-semibold text-[15px] tracking-tight">{h.ticker}</span>
+          <MarketBadge market={h.market} />
         </div>
-        <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${isIL ? 'text-emerald-400/60' : 'text-white/40'}`}>{symbol}</p>
-        <p className="text-white/30 text-[9px] truncate mb-1">{companyName}</p>
-        <h4 className="text-lg font-light tracking-tight">{displayValue}</h4>
+        <div className="text-white/45 text-[12px] mt-0.5 truncate">
+          {h.qty < 1 ? h.qty.toFixed(4) : h.qty.toLocaleString()} · {h.name}
+        </div>
       </div>
-      <div className={`text-[10px] font-bold flex items-center gap-1 ${roiPct === null ? 'text-white/20' : isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-        {roiPct === null ? '—' : `${isPositive ? '+' : ''}${roiPct.toFixed(2)}%`}
-        <span className="text-white/20 font-normal">· {shares} shares</span>
+      <Sparkline data={spark} color={sparkColor} width={52} height={22} />
+      <div className="text-right min-w-[78px]">
+        <div className="text-white font-semibold text-[14px] tabular-nums tracking-tight">
+          {metrics ? formatCurrency(metrics.currentValue, currency) : '—'}
+        </div>
+        <div className="text-[12px] font-medium mt-0.5 tabular-nums" style={{ color: dayColor }}>
+          {h.dayChange === 0 ? '0.00%' : `${h.dayChange > 0 ? '+' : ''}${h.dayChange.toFixed(2)}%`}
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── PortfolioHeader ──────────────────────────────────────────────────────────
-function PortfolioHeader({ holdings, prices, exchangeRate, totalCurrency, onToggleCurrency }) {
-  const { totalUSD, totalILS, usPct, ilPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
+// ─── HoldingDetail ────────────────────────────────────────────────────────────
+function HoldingDetail({ h, onBack }) {
+  const [range, setRange] = useState('1M')
+  const isIL = h.market === 'IL'
+  const currency = isIL ? 'ILS' : 'USD'
+  const metrics = h._metrics
+  const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
 
-  const displayTotal = totalCurrency === 'ILS'
-    ? formatCurrency(totalILS, 'ILS')
-    : formatCurrency(totalUSD, 'USD')
+  const startPrice = h._holding.purchasePrice
+    ? (isIL ? h._holding.purchasePrice / 100 : h._holding.purchasePrice)
+    : (metrics?.effectiveCurrentPrice ?? 0) * 0.85
+  const endPrice = metrics?.effectiveCurrentPrice ?? 0
 
-  const toggleLabel = totalCurrency === 'ILS'
-    ? `↔ ${formatCurrency(totalUSD, 'USD')}`
-    : `↔ ${formatCurrency(totalILS, 'ILS')}`
+  const chartData = useMemo(
+    () => priceHistoryPoints(h.ticker, startPrice, endPrice, 90),
+    [h.ticker, startPrice, endPrice]
+  )
 
-  const gainLabel = gainUSD >= 0
-    ? `+${formatCurrency(gainUSD, 'USD')} today`
-    : `${formatCurrency(gainUSD, 'USD')} today`
-
-  const isGainPositive = gainUSD >= 0
+  const isUp = (metrics?.totalReturn ?? 0) >= 0
+  const accent = isUp ? '#22c55e' : '#ef4444'
+  const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <section className="mt-4 mb-8">
-      <div className="glass-card p-7 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-
-        <div className="flex items-center gap-2 mb-3">
-          <Wallet size={14} className="text-white/60" />
-          <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Total Net Worth</p>
+    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 100 }}>
+      {/* Sticky nav */}
+      <div className="sticky top-0 z-10 px-4 pt-14 pb-3 flex items-center gap-3"
+        style={{ background: 'linear-gradient(180deg,#000 60%,rgba(0,0,0,0))' }}>
+        <button onClick={onBack}
+          className="w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center shrink-0">
+          <svg width="10" height="18" viewBox="0 0 10 18" fill="none">
+            <path d="M8 2L2 9l6 7" stroke="rgba(255,255,255,0.7)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <Logo ticker={h.ticker} size={28} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-bold tracking-tight">{h.ticker}</div>
+          <div className="text-[10px] text-white/45">{h.name}</div>
         </div>
+      </div>
 
-        <h2 className="text-4xl font-light tracking-tighter mb-4">
-          {holdings.length === 0 ? (totalCurrency === 'ILS' ? '₪0' : '$0') : displayTotal}
-        </h2>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {holdings.length === 0 ? (
-            <span className="text-[10px] font-semibold px-3 py-1 rounded-full bg-white/5 text-white/30 border border-white/10">
-              No holdings yet
-            </span>
-          ) : (
-            <>
-              <span className={`text-[10px] font-bold px-3 py-1 rounded-full border flex items-center gap-1 ${isGainPositive ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30'}`}>
-                {isGainPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                {gainLabel}
-              </span>
-              <button
-                onClick={onToggleCurrency}
-                className="text-[10px] font-bold px-3 py-1 rounded-full bg-white/5 text-white/40 border border-white/10 active:opacity-70 transition-opacity"
-              >
-                {toggleLabel}
-              </button>
-            </>
-          )}
-        </div>
-
-        {holdings.length > 0 && (
-          <div className="mt-5">
-            <p className="text-[9px] text-white/20 uppercase tracking-widest mb-1.5">Market Exposure</p>
-            <div className="h-1 rounded-full bg-white/5 overflow-hidden flex mb-1.5">
-              <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${usPct}%` }} />
-              <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${ilPct}%` }} />
+      <div className="px-5">
+        {/* Price */}
+        <div className="mt-1">
+          <div className="text-[11px] font-semibold tracking-widest uppercase text-white/45">Current price</div>
+          <div className="flex items-baseline gap-3 mt-1">
+            <div className="text-[40px] font-bold tracking-tight tabular-nums leading-none">
+              {metrics ? formatCurrency(metrics.effectiveCurrentPrice, currency) : '—'}
             </div>
-            <div className="flex gap-3">
-              <span className="text-[10px] text-white/30 flex items-center gap-1">
-                <span className="text-indigo-400">●</span> US {usPct.toFixed(0)}%
-              </span>
-              <span className="text-[10px] text-white/30 flex items-center gap-1">
-                <span className="text-emerald-400">●</span> IL {ilPct.toFixed(0)}%
-              </span>
+            <div className="text-[15px] font-semibold tabular-nums" style={{ color: dayColor }}>
+              {h.dayChange === 0 ? '0.00%' : `${h.dayChange > 0 ? '+' : ''}${h.dayChange.toFixed(2)}%`}
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Chart */}
+        <div className="mt-4 -mx-5">
+          <PriceChart data={chartData} color={accent} width={390} height={160} />
+        </div>
+
+        {/* Range tabs */}
+        <div className="flex gap-1 mt-2 p-1 rounded-xl bg-white/4">
+          {ranges.map(r => (
+            <button key={r} onClick={() => setRange(r)}
+              className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${range === r ? 'bg-white/10 text-white' : 'text-white/45'}`}>
+              {r}
+            </button>
+          ))}
+        </div>
+
+        {/* Position card */}
+        <div className="mt-5 p-4 rounded-[18px] bg-white/4 border border-white/5">
+          <div className="flex justify-between items-baseline mb-3">
+            <span className="text-[12px] text-white/45">Market value</span>
+            <span className="text-[22px] font-bold tracking-tight tabular-nums">
+              {metrics ? formatCurrency(metrics.currentValue, currency) : '—'}
+            </span>
+          </div>
+          <div className="h-px bg-white/5 -mx-4 mb-3" />
+          <div className="grid grid-cols-2 gap-3">
+            <DetailStat label="Quantity" value={h.qty < 1 ? h.qty.toFixed(4) : h.qty.toLocaleString()} />
+            <DetailStat label="Avg cost"
+              value={metrics ? formatCurrency(
+                isIL ? h._holding.purchasePrice / 100 : h._holding.purchasePrice, currency
+              ) : '—'} />
+            <DetailStat label="Total gain"
+              value={metrics ? `${metrics.totalReturn >= 0 ? '+' : ''}${formatCurrency(metrics.totalReturn, currency)}` : '—'}
+              color={accent} />
+            <DetailStat label="ROI"
+              value={metrics ? `${metrics.roiPct >= 0 ? '+' : ''}${metrics.roiPct.toFixed(2)}%` : '—'}
+              color={accent} />
+            <DetailStat label="Cost basis"
+              value={metrics ? formatCurrency(metrics.adjustedCostBasis, currency) : '—'} />
+            <DetailStat label="Break-even"
+              value={metrics ? formatCurrency(metrics.breakEven, currency) : '—'} />
+          </div>
+        </div>
+
+        {/* Transactions */}
+        {h._holding.purchaseDate || h._holding.purchasePrice ? (
+          <div className="mt-5">
+            <div className="text-[11px] font-semibold tracking-widest uppercase text-white/45 mb-2">Transactions</div>
+            <div className="rounded-[18px] overflow-hidden bg-white/3 border border-white/5">
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 text-[10px] font-bold">BUY</div>
+                <div className="flex-1">
+                  <div className="text-[13px] font-semibold">
+                    {h.qty < 1 ? h.qty.toFixed(4) : h.qty} @ {metrics ? formatCurrency(
+                      isIL ? (h._holding.purchasePrice / 100) : h._holding.purchasePrice, currency
+                    ) : '—'}
+                  </div>
+                  {h._holding.purchaseDate && (
+                    <div className="text-[11px] text-white/45 mt-0.5">
+                      {new Date(h._holding.purchaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  )}
+                </div>
+                {metrics && (
+                  <div className="text-[13px] font-semibold tabular-nums">
+                    {formatCurrency(metrics.adjustedCostBasis, currency)}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
-    </section>
+
+      {/* Action bar */}
+      <div className="sticky bottom-0 px-5 pt-4 pb-8 flex gap-2.5"
+        style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0),#000 30%)' }}>
+        <button className="flex-1 h-12 rounded-2xl font-bold text-[14px] tracking-tight bg-white/8 text-white">Sell</button>
+        <button className="flex-1 h-12 rounded-2xl font-bold text-[14px] tracking-tight text-black"
+          style={{ background: accent, boxShadow: `0 8px 24px ${accent}44` }}>
+          Buy more
+        </button>
+      </div>
+    </div>
   )
 }
 
-// ─── AddStockForm ─────────────────────────────────────────────────────────────
-function AddStockForm({ onAdd }) {
+function DetailStat({ label, value, color }) {
+  return (
+    <div>
+      <div className="text-[11px] text-white/45 font-medium mb-0.5">{label}</div>
+      <div className="text-[16px] font-semibold tabular-nums tracking-tight" style={{ color: color ?? '#fff' }}>{value}</div>
+    </div>
+  )
+}
+
+// ─── AddHoldingSheet ──────────────────────────────────────────────────────────
+function AddHoldingSheet({ onClose, onAdd }) {
   const [symbol, setSymbol] = useState('')
   const [shares, setShares] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [fees, setFees] = useState('')
-  const [dividends, setDividends] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [error, setError] = useState('')
 
   const isTASE = symbol.toUpperCase().endsWith('.TA')
 
-  function handleSubmit(e) {
-    e.preventDefault()
+  function handleSubmit() {
     const sym = symbol.trim().toUpperCase()
     if (!sym) return setError('Ticker is required')
     const qty = parseFloat(shares)
@@ -164,126 +350,246 @@ function AddStockForm({ onAdd }) {
       shares: qty,
       purchasePrice: parseFloat(purchasePrice) || 0,
       fees: parseFloat(fees) || 0,
-      dividends: parseFloat(dividends) || 0,
+      dividends: 0,
       purchaseDate,
     })
-    setSymbol('')
-    setShares('')
-    setPurchasePrice('')
-    setFees('')
-    setDividends('')
-    setPurchaseDate('')
+    onClose()
   }
 
   return (
-    <section className="mb-10">
-      <div className="flex items-center gap-2 mb-5">
-        <Plus size={18} className="text-white/80" />
-        <h3 className="text-sm font-bold uppercase tracking-widest text-white/80">Add New Holding</h3>
+    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div className="relative text-white rounded-t-[28px] p-5 pb-10"
+        style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)' }}>
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-[20px] font-bold tracking-tight">Add holding</span>
+          <button onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
+        </div>
+
+        {error && <p className="text-rose-400 text-xs mb-3">{error}</p>}
+
+        <div className="space-y-3">
+          <SheetField label="Ticker symbol">
+            <input className="sheet-input" placeholder="e.g. AAPL or ELBT.TA"
+              value={symbol} onChange={e => setSymbol(e.target.value)} />
+          </SheetField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <SheetField label="Quantity">
+              <input className="sheet-input" type="number" placeholder="0.00"
+                value={shares} onChange={e => setShares(e.target.value)} />
+            </SheetField>
+            <SheetField label={isTASE ? 'Price (agorot)' : 'Price (USD)'}>
+              <input className="sheet-input" type="number" placeholder="0.00"
+                value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} />
+              {isTASE && <p className="text-[10px] text-white/30 mt-1">100 agorot = ₪1</p>}
+            </SheetField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <SheetField label="Date">
+              <input className="sheet-input" type="date"
+                value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+            </SheetField>
+            <SheetField label="Fees">
+              <input className="sheet-input" type="number" placeholder="0.00"
+                value={fees} onChange={e => setFees(e.target.value)} />
+            </SheetField>
+          </div>
+        </div>
+
+        <button onClick={handleSubmit}
+          className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
+          style={{ background: '#22c55e', boxShadow: '0 10px 30px rgba(34,197,94,0.3)' }}>
+          Save investment
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SheetField({ label, children }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">{label}</div>
+      {children}
+    </div>
+  )
+}
+
+// ─── TabBar ───────────────────────────────────────────────────────────────────
+function TabBar({ onAdd }) {
+  const tabIcon = (path, active) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d={path} stroke={active ? '#22c55e' : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pb-8 pt-2.5"
+      style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)', backdropFilter: 'blur(12px)' }}>
+      <TabBtn icon={tabIcon('M3 13l9-9 9 9M5 11v10h14V11', true)} label="Home" active />
+      <TabBtn icon={tabIcon('M3 17l4-4 4 4 7-7 3 3', false)} label="Markets" />
+      <div className="flex-1 flex justify-center">
+        <button onClick={onAdd}
+          className="w-[52px] h-[52px] rounded-full flex items-center justify-center -translate-y-3 font-bold"
+          style={{ background: '#22c55e', boxShadow: '0 6px 20px rgba(34,197,94,0.4)' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      <TabBtn icon={tabIcon('M3 6h18M3 12h18M3 18h18', false)} label="Activity" />
+      <TabBtn icon={tabIcon('M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6', false)} label="You" />
+    </div>
+  )
+}
+
+function TabBtn({ icon, label, active }) {
+  return (
+    <div className="flex-1 flex flex-col items-center gap-1">
+      {icon}
+      <span className={`text-[10px] font-semibold ${active ? 'text-emerald-400' : 'text-white/30'}`}>{label}</span>
+      {active && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
+    </div>
+  )
+}
+
+// ─── PortfolioScreen ──────────────────────────────────────────────────────────
+function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, onSelectHolding }) {
+  const { totalUSD, totalILS, usPct, ilPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
+  const [range, setRange] = useState('1M')
+  const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
+
+  const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
+  const isGainUp = gainUSD >= 0
+  const gainColor = isGainUp ? '#22c55e' : '#ef4444'
+
+  const chartData = useMemo(() => sparklinePoints(42, 90), [])
+  const chartColor = isGainUp ? '#22c55e' : '#ef4444'
+
+  const sorted = [...enriched].sort((a, b) => {
+    const va = a._metrics?.currentValue ?? 0
+    const vb = b._metrics?.currentValue ?? 0
+    return vb - va
+  })
+
+  const allocationSlices = [
+    { label: 'US', value: usPct, color: '#6366f1' },
+    { label: 'IL', value: ilPct, color: '#22c55e' },
+  ].filter(s => s.value > 0)
+
+  return (
+    <div className="overflow-y-auto no-scrollbar pb-32" style={{ height: '100%' }}>
+      {/* Header */}
+      <div className="px-5 pt-3 pb-1 flex items-end justify-between">
+        <div>
+          <div className="text-[12px] text-white/45 font-medium">My Portfolio</div>
+          <div className="text-[26px] font-bold tracking-tight leading-tight">Overview</div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onToggleCurrency}
+            className="h-9 px-3 rounded-xl border border-white/8 bg-white/4 text-white font-bold text-[12px]">
+            {currency}
+          </button>
+          <button onClick={onRefresh} disabled={loading}
+            className="w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center disabled:opacity-40">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={loading ? 'animate-spin' : ''}>
+              <path d="M21 12a9 9 0 11-3.5-7.1M21 3v6h-6" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="glass-form p-6 space-y-5">
-        {error && <p className="text-rose-400 text-xs px-1">{error}</p>}
-
-        <div className="space-y-2">
-          <label className="text-white/40 text-[10px] font-bold uppercase ml-1 flex items-center gap-2">
-            <Tag size={12} /> Ticker Symbol
-          </label>
-          <input
-            className="w-full glass-input rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all placeholder:text-white/10"
-            placeholder="e.g. AAPL or ELBT.TA"
-            value={symbol}
-            onChange={e => setSymbol(e.target.value)}
-          />
+      {stale && (
+        <div className="mx-5 mb-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
+          ⚠ Could not fetch live prices — showing cached data.
         </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-white/40 text-[10px] font-bold uppercase ml-1 flex items-center gap-2">
-              <Hash size={12} /> Quantity
-            </label>
-            <input
-              type="number"
-              min="0.0001"
-              step="any"
-              inputMode="decimal"
-              placeholder="0.00"
-              className="w-full glass-input rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all placeholder:text-white/10"
-              value={shares}
-              onChange={e => setShares(e.target.value)}
-            />
+      {/* Hero card */}
+      <div className="mx-5 mt-3">
+        <div className="glass-card p-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Total net worth</div>
+          <div className="text-[42px] font-light tracking-tighter leading-none tabular-nums mb-3">
+            {holdings.length ? totalDisplay : (currency === 'ILS' ? '₪0' : '$0')}
           </div>
-          <div className="space-y-2">
-            <label className="text-white/40 text-[10px] font-bold uppercase ml-1 flex items-center gap-2">
-              <DollarSign size={12} /> {isTASE ? 'Price (Agorot)' : 'Price (USD)'}
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              inputMode="decimal"
-              placeholder={isTASE ? 'e.g. 15000' : '0.00'}
-              className="w-full glass-input rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all placeholder:text-white/10"
-              value={purchasePrice}
-              onChange={e => setPurchasePrice(e.target.value)}
-            />
-            {isTASE && <p className="text-[10px] text-white/20 ml-1">100 agorot = ₪1</p>}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            {holdings.length > 0 && (
+              <>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full border flex items-center gap-1.5"
+                  style={{ color: gainColor, background: `${gainColor}1a`, borderColor: `${gainColor}33` }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d={isGainUp ? 'M1 8l3-3 2 2 5-5M8 2h3v3' : 'M1 4l3 3 2-2 5 5M8 10h3V7'}
+                      stroke={gainColor} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+                  </svg>
+                  {isGainUp ? '+' : ''}{formatCurrency(gainUSD, 'USD')} today
+                </span>
+              </>
+            )}
+            {!holdings.length && (
+              <span className="text-[11px] px-3 py-1 rounded-full bg-white/5 text-white/30 border border-white/10">
+                No holdings yet
+              </span>
+            )}
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-white/40 text-[10px] font-bold uppercase ml-1 flex items-center gap-2">
-              <Calendar size={12} /> Date
-            </label>
-            <input
-              type="date"
-              className="w-full glass-input rounded-2xl px-5 py-4 text-xs focus:outline-none focus:ring-1 focus:ring-white/20 transition-all text-white/40"
-              value={purchaseDate}
-              onChange={e => setPurchaseDate(e.target.value)}
-            />
+          {/* Chart */}
+          <div className="-mx-5">
+            <PriceChart data={chartData} color={chartColor} width={350} height={90} />
           </div>
-          <div className="space-y-2">
-            <label className="text-white/40 text-[10px] font-bold uppercase ml-1 flex items-center gap-2">
-              <Coins size={12} /> Rewards
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              inputMode="decimal"
-              placeholder="0.00"
-              className="w-full glass-input rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all placeholder:text-white/10"
-              value={dividends}
-              onChange={e => setDividends(e.target.value)}
-            />
+          {/* Range tabs */}
+          <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
+            {ranges.map(r => (
+              <button key={r} onClick={() => setRange(r)}
+                className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${range === r ? 'bg-white/10 text-white' : 'text-white/40'}`}>
+                {r}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <label className="text-white/40 text-[10px] font-bold uppercase ml-1 flex items-center gap-2">
-            <Banknote size={12} /> Fees {isTASE ? '(ILS)' : '(USD)'}
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            inputMode="decimal"
-            placeholder="0.00"
-            className="w-full glass-input rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 transition-all placeholder:text-white/10"
-            value={fees}
-            onChange={e => setFees(e.target.value)}
-          />
+      {/* Allocation */}
+      {holdings.length > 0 && allocationSlices.length > 0 && (
+        <div className="mx-5 mt-3">
+          <div className="glass-card-small p-4 flex items-center gap-4">
+            <div className="relative">
+              <AllocationRing slices={allocationSlices} size={90} thickness={10} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="text-[9px] text-white/40 font-semibold uppercase tracking-wide">Split</div>
+                <div className="text-[13px] font-bold">{holdings.length}</div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              {allocationSlices.map(s => (
+                <div key={s.label} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: s.color }} />
+                  <span className="text-[13px] font-medium text-white/80">{s.label}</span>
+                  <span className="text-[13px] font-semibold tabular-nums">{s.value.toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+      )}
 
-        <button
-          type="submit"
-          className="w-full bg-white/90 text-black font-bold py-4 rounded-2xl text-[11px] uppercase tracking-widest active:scale-95 transition-all shadow-[0_20px_40px_rgba(255,255,255,0.15)] flex items-center justify-center gap-2"
-        >
-          <Plus size={16} strokeWidth={3} /> Save Investment
-        </button>
-      </form>
-    </section>
+      {/* Holdings list */}
+      {sorted.length > 0 && (
+        <div className="mt-5 px-2">
+          <div className="flex items-baseline justify-between px-3 mb-1">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+              Holdings · {sorted.length}
+            </span>
+            <span className="text-[11px] text-white/40">Value ↓</span>
+          </div>
+          {sorted.map(h => (
+            <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -294,7 +600,9 @@ export default function App() {
   const [exchangeRate, setExchangeRate] = useState(3.7)
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
-  const [totalCurrency, setTotalCurrency] = useState('USD')
+  const [currency, setCurrency] = useState('USD')
+  const [selected, setSelected] = useState(null)
+  const [adding, setAdding] = useState(false)
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
@@ -318,110 +626,103 @@ export default function App() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const handleAdd = (holding) => {
+  const handleAdd = useCallback((holding) => {
     if (holdings.find(h => h.symbol === holding.symbol)) return
     const updated = [...holdings, holding]
     setHoldings(updated)
     saveHoldings(updated)
-  }
+  }, [holdings])
 
-  const handleDelete = (symbol) => {
+  const handleDelete = useCallback((symbol) => {
     const updated = holdings.filter(h => h.symbol !== symbol)
     setHoldings(updated)
     saveHoldings(updated)
     setPrices(prev => { const next = { ...prev }; delete next[symbol]; return next })
-  }
+  }, [holdings])
+
+  // Bridge: enrich holdings with API data + metrics
+  const enriched = useMemo(() => holdings.map(holding => {
+    const priceData = prices[holding.symbol] ?? null
+    const isIL = isILStock(holding.symbol)
+    const apiPrice = priceData?.regularMarketPrice ?? 0
+    const metrics = apiPrice ? calculateHoldingMetrics(holding, apiPrice) : null
+    return {
+      ticker: holding.symbol,
+      name: priceData?.longName ?? holding.symbol,
+      qty: holding.shares,
+      avgCost: holding.purchasePrice,
+      price: apiPrice,
+      dayChange: priceData?.regularMarketChangePercent ?? 0,
+      market: isIL ? 'IL' : 'US',
+      currency: isIL ? 'ILS' : undefined,
+      _holding: holding,
+      _metrics: metrics,
+    }
+  }), [holdings, prices])
 
   return (
-    <div className="flex justify-center bg-[#050505] min-h-screen relative overflow-hidden">
-
-      {/* Background animated glows */}
+    <div className="min-h-screen bg-[#050505] text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', WebkitFontSmoothing: 'antialiased' }}>
+      {/* Glow blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[20%] right-[20%] w-[300px] h-[300px] bg-purple-600/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[150px]" />
-        <div className="absolute top-[50%] left-[40%] w-[250px] h-[250px] bg-emerald-500/10 rounded-full blur-[100px]" />
+        <div className="absolute top-[15%] right-[10%] w-[300px] h-[300px] bg-purple-600/15 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[20%] left-[5%] w-[350px] h-[350px] bg-blue-600/8 rounded-full blur-[150px]" />
+        <div className="absolute top-[55%] left-[45%] w-[220px] h-[220px] bg-emerald-500/8 rounded-full blur-[100px]" />
       </div>
 
-      {/* iPhone container */}
-      <div className="w-[390px] min-h-screen bg-[#050505]/40 text-white relative flex flex-col border-x border-white/10">
-
-        <div className="h-12" />
-
-        {/* Header */}
-        <header className="px-6 py-4 flex justify-between items-center relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <UserCircle size={16} className="text-white/50" />
-              <p className="text-white/50 text-xs font-bold uppercase tracking-wider">Welcome Back</p>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">My Portfolio</h1>
-          </div>
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="w-10 h-10 rounded-2xl glass-effect flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40"
-            aria-label="Refresh prices"
-          >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-          </button>
-        </header>
-
-        {/* Main */}
-        <main className="flex-1 overflow-y-auto px-6 pb-40 no-scrollbar relative z-10">
-
-          {stale && (
-            <div className="mb-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
-              ⚠ Could not fetch live prices — showing cached data.
-            </div>
-          )}
-
-          <PortfolioHeader
+      <div className="max-w-[430px] mx-auto relative" style={{ minHeight: '100vh' }}>
+        {/* Portfolio screen */}
+        <div className="absolute inset-0">
+          <PortfolioScreen
             holdings={holdings}
+            enriched={enriched}
             prices={prices}
             exchangeRate={exchangeRate}
-            totalCurrency={totalCurrency}
-            onToggleCurrency={() => setTotalCurrency(c => c === 'USD' ? 'ILS' : 'USD')}
+            currency={currency}
+            onToggleCurrency={() => setCurrency(c => c === 'USD' ? 'ILS' : 'USD')}
+            onRefresh={refresh}
+            loading={loading}
+            stale={stale}
+            onSelectHolding={setSelected}
           />
-
-          <AddStockForm onAdd={handleAdd} />
-
-          {holdings.length > 0 && (
-            <>
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <LayoutGrid size={16} className="text-white/40" />
-                  <h3 className="text-sm font-bold uppercase tracking-widest">Asset Holdings</h3>
-                </div>
-                <p className="text-[10px] text-white/20">{holdings.length} stock{holdings.length !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {holdings.map(h => (
-                  <StockCard
-                    key={h.symbol}
-                    holding={h}
-                    price={prices[h.symbol] ?? null}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </main>
-
-        {/* Bottom tab bar */}
-        <div className="absolute bottom-6 left-6 right-6 z-20">
-          <footer className="glass-nav px-8 py-4 flex justify-between items-center shadow-2xl">
-            <TabItem icon={<LayoutGrid size={22} />} active />
-            <TabItem icon={<PieChart size={22} />} />
-            <div className="w-14 h-14 bg-white text-black rounded-2xl flex items-center justify-center shadow-2xl active:scale-90 transition-transform -translate-y-1">
-              <Plus size={28} strokeWidth={2.5} />
-            </div>
-            <TabItem icon={<History size={22} />} />
-            <TabItem icon={<UserCircle size={22} />} />
-          </footer>
         </div>
 
+        {/* Tab bar */}
+        <TabBar onAdd={() => setAdding(true)} />
+
+        {/* Detail overlay */}
+        {selected && (
+          <HoldingDetail
+            h={selected}
+            onBack={() => setSelected(null)}
+          />
+        )}
+
+        {/* Add sheet */}
+        {adding && (
+          <AddHoldingSheet
+            onClose={() => setAdding(false)}
+            onAdd={handleAdd}
+          />
+        )}
       </div>
+
+      <style>{`
+        .sheet-input {
+          width: 100%;
+          height: 46px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.03);
+          color: white;
+          padding: 0 14px;
+          font-size: 15px;
+          outline: none;
+          box-sizing: border-box;
+          font-family: inherit;
+        }
+        .sheet-input::placeholder { color: rgba(255,255,255,0.2); }
+        .sheet-input[type="date"] { color: rgba(255,255,255,0.6); font-size: 14px; }
+      `}</style>
     </div>
   )
 }

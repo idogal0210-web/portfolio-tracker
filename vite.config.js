@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: './',
+  base: '/portfolio-tracker/',
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],

@@ -18,6 +18,9 @@
     filter: invert(1);
     opacity: 0.3;
   }
+  input[type="date"] {
+    color-scheme: dark;
+  }
 }
 
 @layer utilities {
