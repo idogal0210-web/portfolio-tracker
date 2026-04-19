@@ -51,9 +51,7 @@ function generateLogo(ticker) {
 function Logo({ ticker, size = 40 }) {
   const { bg, char } = generateLogo(ticker)
   return (
-    <div style={{ width: size, height: size, borderRadius: size / 2, background: bg, flexShrink: 0 }}
-      className="flex items-center justify-center font-bold text-white"
-      style={{ width: size, height: size, borderRadius: size / 2, background: bg, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: size * 0.42 }}>
+    <div style={{ width: size, height: size, borderRadius: size / 2, background: bg, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: size * 0.42 }}>
       {char}
     </div>
   )
@@ -661,7 +659,7 @@ export default function App() {
   }), [holdings, prices])
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', WebkitFontSmoothing: 'antialiased' }}>
+    <div className="h-full bg-[#050505] text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', WebkitFontSmoothing: 'antialiased' }}>
       {/* Glow blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[15%] right-[10%] w-[300px] h-[300px] bg-purple-600/15 rounded-full blur-[120px] animate-pulse" />
@@ -669,7 +667,7 @@ export default function App() {
         <div className="absolute top-[55%] left-[45%] w-[220px] h-[220px] bg-emerald-500/8 rounded-full blur-[100px]" />
       </div>
 
-      <div className="max-w-[430px] mx-auto relative" style={{ minHeight: '100vh' }}>
+      <div className="max-w-[430px] mx-auto relative h-full">
         {/* Portfolio screen */}
         <div className="absolute inset-0">
           <PortfolioScreen
