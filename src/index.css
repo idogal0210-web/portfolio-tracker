@@ -7,12 +7,14 @@
 
 @layer base {
   html, body, #root {
-    height: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
     background-color: #050505;
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
   }
   input::-webkit-calendar-picker-indicator {
     filter: invert(1);
@@ -32,26 +34,24 @@
 
   .glass-effect {
     background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .glass-card {
     background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-radius: 35px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow:
-      0 25px 50px -12px rgba(0, 0, 0, 0.5),
-      inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
   }
 
   .glass-card-small {
     background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 28px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
@@ -59,8 +59,8 @@
 
   .glass-form {
     background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border-radius: 35px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.2);
@@ -75,8 +75,8 @@
 
   .glass-nav {
     background: rgba(20, 20, 25, 0.7);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.1);
   }

@@ -200,10 +200,13 @@ function HoldingDetail({ h, onBack }) {
   const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 100 }}>
+    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
       {/* Sticky nav */}
-      <div className="sticky top-0 z-10 px-4 pt-14 pb-3 flex items-center gap-3"
-        style={{ background: 'linear-gradient(180deg,#000 60%,rgba(0,0,0,0))' }}>
+      <div className="sticky top-0 z-10 px-4 pb-3 flex items-center gap-3"
+        style={{
+          background: 'linear-gradient(180deg,#000 60%,rgba(0,0,0,0))',
+          paddingTop: 'calc(env(safe-area-inset-top) + 20px)',
+        }}>
         <button onClick={onBack}
           className="w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center shrink-0">
           <svg width="10" height="18" viewBox="0 0 10 18" fill="none">
@@ -357,8 +360,12 @@ function AddHoldingSheet({ onClose, onAdd }) {
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 pb-10"
-        style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)' }}>
+      <div className="relative text-white rounded-t-[28px] p-5"
+        style={{
+          background: '#0E0E10',
+          boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)',
+        }}>
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
         <div className="flex items-center justify-between mb-5">
           <span className="text-[20px] font-bold tracking-tight">Add holding</span>
@@ -425,8 +432,12 @@ function TabBar({ onAdd }) {
     </svg>
   )
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pb-8 pt-2.5"
-      style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)', backdropFilter: 'blur(12px)' }}>
+    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-2.5"
+      style={{
+        background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)',
+        backdropFilter: 'blur(12px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+      }}>
       <TabBtn icon={tabIcon('M3 13l9-9 9 9M5 11v10h14V11', true)} label="Home" active />
       <TabBtn icon={tabIcon('M3 17l4-4 4 4 7-7 3 3', false)} label="Markets" />
       <div className="flex-1 flex justify-center">
@@ -479,7 +490,11 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   ].filter(s => s.value > 0)
 
   return (
-    <div className="overflow-y-auto no-scrollbar pb-32" style={{ height: '100%' }}>
+    <div className="overflow-y-auto no-scrollbar" style={{
+      height: '100%',
+      paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
+      paddingTop: 'env(safe-area-inset-top)',
+    }}>
       {/* Header */}
       <div className="px-5 pt-3 pb-1 flex items-end justify-between">
         <div>
@@ -509,7 +524,6 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       {/* Hero card */}
       <div className="mx-5 mt-3">
         <div className="glass-card p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Total net worth</div>
           <div className="text-[42px] font-light tracking-tighter leading-none tabular-nums mb-3">
             {holdings.length ? totalDisplay : (currency === 'ILS' ? '₪0' : '$0')}
@@ -659,16 +673,13 @@ export default function App() {
   }), [holdings, prices])
 
   return (
-    <div className="h-full bg-[#050505] text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', WebkitFontSmoothing: 'antialiased' }}>
-      {/* Glow blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[15%] right-[10%] w-[300px] h-[300px] bg-purple-600/15 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[20%] left-[5%] w-[350px] h-[350px] bg-blue-600/8 rounded-full blur-[150px]" />
-        <div className="absolute top-[55%] left-[45%] w-[220px] h-[220px] bg-emerald-500/8 rounded-full blur-[100px]" />
-      </div>
-
-      <div className="max-w-[430px] mx-auto relative h-full">
-        {/* Portfolio screen */}
+    <div className="bg-[#050505] text-white" style={{
+      minHeight: '100dvh',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      WebkitFontSmoothing: 'antialiased',
+      backgroundImage: 'radial-gradient(at 85% 15%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(at 10% 85%, rgba(37,99,235,0.06), transparent 60%)',
+    }}>
+      <div className="max-w-[430px] mx-auto relative" style={{ minHeight: '100dvh' }}>
         <div className="absolute inset-0">
           <PortfolioScreen
             holdings={holdings}
