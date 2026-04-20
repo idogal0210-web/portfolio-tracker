@@ -398,8 +398,15 @@ function AddHoldingSheet({ onClose, onAdd }) {
 
           <div className="grid grid-cols-2 gap-3">
             <SheetField label="Date">
-              <input className="sheet-input" type="date"
-                value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+              <div className="relative">
+                <input className="sheet-input sheet-input-date" type="date"
+                  value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+                {!purchaseDate && (
+                  <span className="absolute left-[14px] top-1/2 -translate-y-1/2 text-white/30 text-[14px] pointer-events-none select-none">
+                    Select date
+                  </span>
+                )}
+              </div>
             </SheetField>
             <SheetField label="Fees">
               <input className="sheet-input" type="number" placeholder="0.00"
@@ -762,7 +769,9 @@ export default function App() {
           font-family: inherit;
         }
         .sheet-input::placeholder { color: rgba(255,255,255,0.2); }
-        .sheet-input[type="date"] { color: rgba(255,255,255,0.6); font-size: 14px; }
+        .sheet-input[type="date"] { color: rgba(255,255,255,0.85); font-size: 14px; min-height: 46px; }
+        .sheet-input-date::-webkit-date-and-time-value { text-align: left; }
+        .sheet-input-date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
       `}</style>
     </div>
   )
