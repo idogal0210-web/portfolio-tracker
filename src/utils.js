@@ -19,6 +19,13 @@ export const formatCurrency = (amount, currency) => {
   return currency === 'ILS' ? `₪${formatted}` : `$${formatted}`
 }
 
+export const formatCurrencyPrecise = (amount, currency) => {
+  const abs = Math.abs(amount)
+  const decimals = abs === 0 ? 2 : abs < 0.01 ? 6 : abs < 1 ? 4 : abs < 10000 ? 2 : 0
+  const formatted = amount.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+  return currency === 'ILS' ? `₪${formatted}` : `$${formatted}`
+}
+
 export const calculateTotals = (holdings, prices, exchangeRate) => {
   let usValueUSD = 0
   let ilValueUSD = 0

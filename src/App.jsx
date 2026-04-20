@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  isCrypto, getMarket, displaySymbol,
-  formatCurrency, calculateTotals, calculateAllTimeReturn,
+  isCrypto, isILStock, getMarket, displaySymbol,
+  formatCurrency, formatCurrencyPrecise, calculateTotals, calculateAllTimeReturn,
   loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
   loadExchangeRate, saveExchangeRate,
   calculateHoldingMetrics
@@ -76,6 +76,25 @@ const CRYPTO_COLORS = {
   ADA:  '#3468dc',
   DOGE: '#c2a633',
   XRP:  '#00a4d3',
+}
+
+const SECTOR_MAP = {
+  AAPL:'Tech', MSFT:'Tech', GOOGL:'Tech', GOOG:'Tech', META:'Tech', NVDA:'Tech',
+  TSLA:'Tech', AMZN:'Tech', NFLX:'Tech', AMD:'Tech', CRM:'Tech', ORCL:'Tech',
+  ADBE:'Tech', INTC:'Tech', QCOM:'Tech', UBER:'Tech', LYFT:'Tech', SNAP:'Tech',
+  JPM:'Finance', BAC:'Finance', GS:'Finance', V:'Finance', MA:'Finance',
+  WFC:'Finance', MS:'Finance', AXP:'Finance', BLK:'Finance', C:'Finance',
+  XOM:'Energy', CVX:'Energy', COP:'Energy', SLB:'Energy', BP:'Energy',
+  JNJ:'Healthcare', PFE:'Healthcare', UNH:'Healthcare', MRNA:'Healthcare',
+  ABBV:'Healthcare', LLY:'Healthcare', BMY:'Healthcare', MRK:'Healthcare',
+  WMT:'Consumer', HD:'Consumer', MCD:'Consumer', KO:'Consumer', PEP:'Consumer',
+  COST:'Consumer', NKE:'Consumer', SBUX:'Consumer', TGT:'Consumer',
+  SPY:'Index', QQQ:'Index', VTI:'Index', VOO:'Index', IWM:'Index', GLD:'Index',
+}
+
+const SECTOR_COLORS = {
+  Tech:'#6366f1', Finance:'#22c55e', Energy:'#f59e0b', Healthcare:'#ec4899',
+  Consumer:'#06b6d4', Index:'#8b5cf6', Crypto:'#f97316', IL:'#3b82f6', Other:'rgba(255,255,255,0.25)',
 }
 
 function generateLogo(ticker) {
@@ -335,7 +354,7 @@ function HoldingDetail({ h, onBack, apiKey }) {
           <div className="grid grid-cols-2 gap-3">
             <DetailStat label="Quantity" value={h.qty < 1 ? h.qty.toFixed(4) : h.qty.toLocaleString()} />
             <DetailStat label="Avg cost"
-              value={metrics ? formatCurrency(
+              value={metrics ? formatCurrencyPrecise(
                 isIL ? h._holding.purchasePrice / 100 : h._holding.purchasePrice, currency
               ) : '—'} />
             <DetailStat label="Total gain"
@@ -347,7 +366,7 @@ function HoldingDetail({ h, onBack, apiKey }) {
             <DetailStat label="Cost basis"
               value={metrics ? formatCurrency(metrics.adjustedCostBasis, currency) : '—'} />
             <DetailStat label="Break-even"
-              value={metrics ? formatCurrency(metrics.breakEven, currency) : '—'} />
+              value={metrics ? formatCurrencyPrecise(metrics.breakEven, currency) : '—'} />
           </div>
         </div>
 
@@ -399,22 +418,33 @@ function AddHoldingSheet({ onClose, onAdd }) {
   const [symbol, setSymbol] = useState('')
   const [shares, setShares] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
+  const [fees, setFees] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [error, setError] = useState('')
 
-  const isTASE = symbol.toUpperCase().endsWith('.TA')
+  const sym = symbol.trim().toUpperCase()
+  const isTASE = isILStock(sym)
+  const isCryptoSym = isCrypto(sym)
+  const marketType = isTASE ? 'IL' : isCryptoSym ? 'CRYPTO' : 'US'
+  const marketLabel = isTASE ? 'Israeli stock (TASE)' : isCryptoSym ? 'Cryptocurrency' : 'US stock'
+  const marketColor = isTASE ? '#6366f1' : isCryptoSym ? '#f59e0b' : 'rgba(255,255,255,0.35)'
+  const priceCurrency = isTASE ? 'ILS' : 'USD'
+  const priceLabel = isTASE ? 'Price (agorot)' : isCryptoSym ? 'Price (USD)' : 'Price (USD)'
+  const feesLabel = isTASE ? 'Fees (₪)' : 'Fees ($)'
 
   function handleSubmit() {
-    const sym = symbol.trim().toUpperCase()
-    if (!sym) return setError('Ticker is required')
+    const cleanSym = sym
+    if (!cleanSym) return setError('Ticker is required')
     const qty = parseFloat(shares)
     if (!qty || qty <= 0) return setError('Enter a valid quantity')
+    const fmtRegex = /^[A-Z0-9]+(\.[A-Z]{2,4}|-USD)?$/
+    if (!fmtRegex.test(cleanSym)) return setError('Invalid ticker format (e.g. AAPL, TEVA.TA, BTC-USD)')
     setError('')
     onAdd({
-      symbol: sym,
+      symbol: cleanSym,
       shares: qty,
       purchasePrice: parseFloat(purchasePrice) || 0,
-      fees: 0,
+      fees: parseFloat(fees) || 0,
       dividends: 0,
       purchaseDate,
     })
@@ -441,33 +471,44 @@ function AddHoldingSheet({ onClose, onAdd }) {
 
         <div className="space-y-3">
           <SheetField label="Ticker symbol">
-            <input className="sheet-input" placeholder="e.g. AAPL, ELBT.TA, BTC-USD"
-              value={symbol} onChange={e => setSymbol(e.target.value)} />
+            <input className="sheet-input" placeholder="e.g. AAPL, TEVA.TA, BTC-USD"
+              value={symbol} onChange={e => setSymbol(e.target.value)} autoCapitalize="characters" />
+            {sym && (
+              <p className="text-[10px] mt-1 font-semibold" style={{ color: marketColor }}>
+                {marketLabel}
+              </p>
+            )}
           </SheetField>
 
           <div className="grid grid-cols-2 gap-3">
             <SheetField label="Quantity">
-              <input className="sheet-input" type="number" placeholder="0.00"
+              <input className="sheet-input" type="number" placeholder="0.00" inputMode="decimal"
                 value={shares} onChange={e => setShares(e.target.value)} />
             </SheetField>
-            <SheetField label={isTASE ? 'Price (agorot)' : 'Price (USD)'}>
-              <input className="sheet-input" type="number" placeholder="0.00"
+            <SheetField label={priceLabel}>
+              <input className="sheet-input" type="number" placeholder="0.00" inputMode="decimal"
                 value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} />
               {isTASE && <p className="text-[10px] text-white/30 mt-1">100 agorot = ₪1</p>}
             </SheetField>
           </div>
 
-          <SheetField label="Date">
-            <div className="relative">
-              <input className="sheet-input sheet-input-date" type="date"
-                value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
-              {!purchaseDate && (
-                <span className="absolute left-[14px] top-1/2 -translate-y-1/2 text-white/30 text-[14px] pointer-events-none select-none">
-                  Select date
-                </span>
-              )}
-            </div>
-          </SheetField>
+          <div className="grid grid-cols-2 gap-3">
+            <SheetField label={feesLabel}>
+              <input className="sheet-input" type="number" placeholder="0.00" inputMode="decimal"
+                value={fees} onChange={e => setFees(e.target.value)} />
+            </SheetField>
+            <SheetField label="Date">
+              <div className="relative">
+                <input className="sheet-input sheet-input-date" type="date"
+                  value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+                {!purchaseDate && (
+                  <span className="absolute left-[14px] top-1/2 -translate-y-1/2 text-white/30 text-[14px] pointer-events-none select-none">
+                    Select date
+                  </span>
+                )}
+              </div>
+            </SheetField>
+          </div>
         </div>
 
         <button onClick={handleSubmit}
@@ -546,6 +587,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
   const [range, setRange] = useState('1M')
+  const [allocTab, setAllocTab] = useState('geo')
   const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
 
   const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
@@ -562,11 +604,33 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
     return vb - va
   })
 
-  const allocationSlices = [
+  const geoSlices = [
     { label: 'Crypto', value: cryptoPct, color: '#f59e0b' },
     { label: 'US',     value: usPct,     color: '#22c55e' },
     { label: 'IL',     value: ilPct,     color: '#6366f1' },
   ].filter(s => s.value > 0)
+
+  const assetSlices = [
+    { label: 'Equities', value: usPct + ilPct, color: '#22c55e' },
+    { label: 'Crypto',   value: cryptoPct,     color: '#f59e0b' },
+  ].filter(s => s.value > 0)
+
+  const sectorValues = useMemo(() => {
+    const totals = {}
+    for (const h of enriched) {
+      if (!h._metrics) continue
+      const baseSymbol = displaySymbol(h.ticker).replace('.TA', '')
+      const sector = h.market === 'CRYPTO' ? 'Crypto' : h.market === 'IL' ? 'IL' : (SECTOR_MAP[baseSymbol] ?? 'Other')
+      const val = h.market === 'IL' ? h._metrics.currentValue / exchangeRate : h._metrics.currentValue
+      totals[sector] = (totals[sector] ?? 0) + val
+    }
+    const grand = Object.values(totals).reduce((a, b) => a + b, 0) || 1
+    return Object.entries(totals)
+      .map(([label, val]) => ({ label, value: (val / grand) * 100, color: SECTOR_COLORS[label] ?? SECTOR_COLORS.Other }))
+      .sort((a, b) => b.value - a.value)
+  }, [enriched, exchangeRate])
+
+  const allocationSlices = allocTab === 'asset' ? assetSlices : allocTab === 'sector' ? sectorValues : geoSlices
 
   const updatedText = formatUpdatedAt(lastUpdated)
 
@@ -580,7 +644,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       <div className="px-5 pt-3 pb-1 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="text-[12px] text-white/45 font-medium">My Portfolio</div>
-          <div className="text-[28px] font-bold tracking-tight leading-tight">Overview</div>
+          <div className="text-[28px] font-bold tracking-tight leading-tight">🔹 Overview</div>
           {updatedText && (
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/45">
               <span className="relative inline-flex w-1.5 h-1.5">
@@ -659,10 +723,20 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       </div>
 
       {/* Allocation */}
-      {holdings.length > 0 && allocationSlices.length > 0 && (
+      {holdings.length > 0 && geoSlices.length > 0 && (
         <div className="mx-5 mt-3">
           <div className="glass-card-small p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-3">Allocation</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[12px] font-bold uppercase tracking-widest text-white/70">🔹 Allocation</div>
+              <div className="flex gap-0.5 p-0.5 rounded-lg bg-black/30">
+                {[['geo','Geo'],['asset','Asset'],['sector','Sector']].map(([key,label]) => (
+                  <button key={key} onClick={() => setAllocTab(key)}
+                    className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-colors ${allocTab === key ? 'bg-white/12 text-white' : 'text-white/35'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <AllocationBar slices={allocationSlices} />
             <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-3">
               {allocationSlices.map(s => (
@@ -681,8 +755,8 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       {sorted.length > 0 && (
         <div className="mx-5 mt-4">
           <div className="flex items-baseline justify-between px-1 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
-              Holdings · {sorted.length}
+            <span className="text-[12px] font-bold uppercase tracking-widest text-white/70">
+              🔹 Holdings · {sorted.length}
             </span>
             <span className="text-[11px] text-white/40">Value ↓</span>
           </div>
