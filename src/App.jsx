@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  isILStock, formatCurrency, calculateTotals,
+  isCrypto, getMarket, displaySymbol,
+  formatCurrency, calculateTotals, calculateAllTimeReturn,
   loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
   calculateHoldingMetrics
 } from './utils'
@@ -42,8 +43,20 @@ function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
 // ─── logo ─────────────────────────────────────────────────────────────────────
 const LOGO_COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6']
 
+const CRYPTO_COLORS = {
+  BTC:  '#f7931a',
+  ETH:  '#8b5cf6',
+  SOL:  '#d946ef',
+  ADA:  '#3468dc',
+  DOGE: '#c2a633',
+  XRP:  '#00a4d3',
+}
+
 function generateLogo(ticker) {
-  const base = ticker.replace('.TA', '')
+  const base = displaySymbol(ticker).replace('.TA', '').toUpperCase()
+  if (isCrypto(ticker) && CRYPTO_COLORS[base]) {
+    return { bg: CRYPTO_COLORS[base], char: base[0] }
+  }
   return { bg: LOGO_COLORS[base.charCodeAt(0) % LOGO_COLORS.length], char: base[0] }
 }
 
@@ -104,60 +117,50 @@ function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
   )
 }
 
-function AllocationRing({ slices, size = 110, thickness = 12 }) {
-  const r = (size - thickness) / 2
-  const c = 2 * Math.PI * r
-  const total = slices.reduce((s, x) => s + x.value, 0) || 1
-  let offset = 0
-  return (
-    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={thickness} />
-      {slices.map((s, i) => {
-        const len = (s.value / total) * c
-        const el = (
-          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none"
-            stroke={s.color} strokeWidth={thickness}
-            strokeDasharray={`${len.toFixed(2)} ${(c - len).toFixed(2)}`}
-            strokeDashoffset={(-offset).toFixed(2)} />
-        )
-        offset += len
-        return el
-      })}
-    </svg>
-  )
-}
-
 // ─── market badge ─────────────────────────────────────────────────────────────
 function MarketBadge({ market }) {
   const styles = {
-    IL: 'bg-blue-500/10 text-blue-400',
-    US: 'bg-white/5 text-white/40',
+    IL: 'bg-blue-500/15 text-blue-400',
+    US: 'bg-white/8 text-white/55',
+    CRYPTO: 'bg-orange-500/15 text-orange-400',
   }
   return (
-    <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${styles[market] ?? styles.US}`}>
+    <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md ${styles[market] ?? styles.US}`}>
       {market}
     </span>
   )
 }
 
+// ─── AllocationBar ────────────────────────────────────────────────────────────
+function AllocationBar({ slices }) {
+  const total = slices.reduce((s, x) => s + x.value, 0) || 1
+  return (
+    <div className="flex w-full h-2 rounded-full overflow-hidden bg-white/5">
+      {slices.map((s, i) => (
+        <div key={i} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} />
+      ))}
+    </div>
+  )
+}
+
 // ─── HoldingRow ───────────────────────────────────────────────────────────────
 function HoldingRow({ h, onClick }) {
-  const isIL = h.market === 'IL'
-  const currency = isIL ? 'ILS' : 'USD'
+  const currency = h.market === 'IL' ? 'ILS' : 'USD'
   const metrics = h._metrics
   const spark = useMemo(() => sparklinePoints(h.ticker.charCodeAt(0) * 7 + h.ticker.length * 3), [h.ticker])
   const pl = metrics ? metrics.totalReturn : 0
   const isUp = pl >= 0
   const sparkColor = isUp ? '#22c55e' : '#ef4444'
   const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
+  const display = displaySymbol(h.ticker)
 
   return (
     <div onClick={onClick}
-      className="flex items-center gap-3 px-4 py-3.5 rounded-2xl cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5">
-      <Logo ticker={h.ticker} size={42} />
+      className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5">
+      <Logo ticker={h.ticker} size={40} />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-white font-semibold text-[15px] tracking-tight">{h.ticker}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-white font-semibold text-[15px] tracking-tight">{display}</span>
           <MarketBadge market={h.market} />
         </div>
         <div className="text-white/45 text-[12px] mt-0.5 truncate">
@@ -215,7 +218,7 @@ function HoldingDetail({ h, onBack }) {
         </button>
         <Logo ticker={h.ticker} size={28} />
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-bold tracking-tight">{h.ticker}</div>
+          <div className="text-[14px] font-bold tracking-tight">{displaySymbol(h.ticker)}</div>
           <div className="text-[10px] text-white/45">{h.name}</div>
         </div>
       </div>
@@ -377,7 +380,7 @@ function AddHoldingSheet({ onClose, onAdd }) {
 
         <div className="space-y-3">
           <SheetField label="Ticker symbol">
-            <input className="sheet-input" placeholder="e.g. AAPL or ELBT.TA"
+            <input className="sheet-input" placeholder="e.g. AAPL, ELBT.TA, BTC-USD"
               value={symbol} onChange={e => setSymbol(e.target.value)} />
           </SheetField>
 
@@ -466,14 +469,27 @@ function TabBtn({ icon, label, active }) {
 }
 
 // ─── PortfolioScreen ──────────────────────────────────────────────────────────
-function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, onSelectHolding }) {
-  const { totalUSD, totalILS, usPct, ilPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
+const formatUpdatedAt = (date) => {
+  if (!date) return null
+  const d = new Date(date)
+  const month = d.toLocaleString('en-US', { month: 'short' })
+  const day = d.getDate()
+  const year = d.getFullYear()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `Updated ${month} ${day}, ${year} · ${hh}:${mm}`
+}
+
+function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding }) {
+  const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
+  const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
   const [range, setRange] = useState('1M')
   const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
 
   const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
   const isGainUp = gainUSD >= 0
   const gainColor = isGainUp ? '#22c55e' : '#ef4444'
+  const isAllTimeUp = allTimePct >= 0
 
   const chartData = useMemo(() => sparklinePoints(42, 90), [])
   const chartColor = isGainUp ? '#22c55e' : '#ef4444'
@@ -485,9 +501,12 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   })
 
   const allocationSlices = [
-    { label: 'US', value: usPct, color: '#6366f1' },
-    { label: 'IL', value: ilPct, color: '#22c55e' },
+    { label: 'Crypto', value: cryptoPct, color: '#f59e0b' },
+    { label: 'US',     value: usPct,     color: '#22c55e' },
+    { label: 'IL',     value: ilPct,     color: '#6366f1' },
   ].filter(s => s.value > 0)
+
+  const updatedText = formatUpdatedAt(lastUpdated)
 
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
@@ -496,12 +515,21 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       paddingTop: 'env(safe-area-inset-top)',
     }}>
       {/* Header */}
-      <div className="px-5 pt-3 pb-1 flex items-end justify-between">
-        <div>
+      <div className="px-5 pt-3 pb-1 flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
           <div className="text-[12px] text-white/45 font-medium">My Portfolio</div>
-          <div className="text-[26px] font-bold tracking-tight leading-tight">Overview</div>
+          <div className="text-[28px] font-bold tracking-tight leading-tight">Overview</div>
+          {updatedText && (
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/45">
+              <span className="relative inline-flex w-1.5 h-1.5">
+                <span className="absolute inset-0 rounded-full bg-emerald-400/60 animate-ping" />
+                <span className="relative w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              </span>
+              {updatedText}
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-5">
           <button onClick={onToggleCurrency}
             className="h-9 px-3 rounded-xl border border-white/8 bg-white/4 text-white font-bold text-[12px]">
             {currency}
@@ -516,28 +544,32 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       </div>
 
       {stale && (
-        <div className="mx-5 mb-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
+        <div className="mx-5 mt-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
           ⚠ Could not fetch live prices — showing cached data.
         </div>
       )}
 
       {/* Hero card */}
-      <div className="mx-5 mt-3">
+      <div className="mx-5 mt-4">
         <div className="glass-card p-5 relative overflow-hidden">
           <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Total net worth</div>
-          <div className="text-[42px] font-light tracking-tighter leading-none tabular-nums mb-3">
+          <div className="text-[44px] font-bold tracking-tighter leading-none tabular-nums mb-3">
             {holdings.length ? totalDisplay : (currency === 'ILS' ? '₪0' : '$0')}
           </div>
           <div className="flex items-center gap-2 flex-wrap mb-4">
             {holdings.length > 0 && (
               <>
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full border flex items-center gap-1.5"
-                  style={{ color: gainColor, background: `${gainColor}1a`, borderColor: `${gainColor}33` }}>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5"
+                  style={{ color: gainColor, background: `${gainColor}1f` }}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d={isGainUp ? 'M1 8l3-3 2 2 5-5M8 2h3v3' : 'M1 4l3 3 2-2 5 5M8 10h3V7'}
                       stroke={gainColor} strokeWidth="1.6" fill="none" strokeLinecap="round" />
                   </svg>
                   {isGainUp ? '+' : ''}{formatCurrency(gainUSD, 'USD')} today
+                </span>
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/6 tabular-nums"
+                  style={{ color: isAllTimeUp ? '#22c55e' : '#ef4444' }}>
+                  {isAllTimeUp ? '+' : ''}{allTimePct.toFixed(2)}% all time
                 </span>
               </>
             )}
@@ -566,20 +598,15 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       {/* Allocation */}
       {holdings.length > 0 && allocationSlices.length > 0 && (
         <div className="mx-5 mt-3">
-          <div className="glass-card-small p-4 flex items-center gap-4">
-            <div className="relative">
-              <AllocationRing slices={allocationSlices} size={90} thickness={10} />
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-[9px] text-white/40 font-semibold uppercase tracking-wide">Split</div>
-                <div className="text-[13px] font-bold">{holdings.length}</div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
+          <div className="glass-card-small p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-3">Allocation</div>
+            <AllocationBar slices={allocationSlices} />
+            <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-3">
               {allocationSlices.map(s => (
-                <div key={s.label} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: s.color }} />
-                  <span className="text-[13px] font-medium text-white/80">{s.label}</span>
-                  <span className="text-[13px] font-semibold tabular-nums">{s.value.toFixed(0)}%</span>
+                <div key={s.label} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                  <span className="text-[12px] font-semibold text-white/80">{s.label}</span>
+                  <span className="text-[12px] text-white/50 tabular-nums">{s.value.toFixed(0)}%</span>
                 </div>
               ))}
             </div>
@@ -589,16 +616,18 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
 
       {/* Holdings list */}
       {sorted.length > 0 && (
-        <div className="mt-5 px-2">
-          <div className="flex items-baseline justify-between px-3 mb-1">
+        <div className="mx-5 mt-4">
+          <div className="flex items-baseline justify-between px-1 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
               Holdings · {sorted.length}
             </span>
             <span className="text-[11px] text-white/40">Value ↓</span>
           </div>
-          {sorted.map(h => (
-            <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
-          ))}
+          <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
+            {sorted.map(h => (
+              <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -615,6 +644,7 @@ export default function App() {
   const [currency, setCurrency] = useState('USD')
   const [selected, setSelected] = useState(null)
   const [adding, setAdding] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState(null)
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
@@ -628,6 +658,7 @@ export default function App() {
       setPrices(priceMap)
       setExchangeRate(rate)
       savePricesCache(priceMap)
+      setLastUpdated(Date.now())
     } catch (err) {
       console.error('Price fetch failed:', err)
       setStale(true)
@@ -655,18 +686,18 @@ export default function App() {
   // Bridge: enrich holdings with API data + metrics
   const enriched = useMemo(() => holdings.map(holding => {
     const priceData = prices[holding.symbol] ?? null
-    const isIL = isILStock(holding.symbol)
+    const market = getMarket(holding.symbol)
     const apiPrice = priceData?.regularMarketPrice ?? 0
     const metrics = apiPrice ? calculateHoldingMetrics(holding, apiPrice) : null
     return {
       ticker: holding.symbol,
-      name: priceData?.longName ?? holding.symbol,
+      name: priceData?.longName ?? displaySymbol(holding.symbol),
       qty: holding.shares,
       avgCost: holding.purchasePrice,
       price: apiPrice,
       dayChange: priceData?.regularMarketChangePercent ?? 0,
-      market: isIL ? 'IL' : 'US',
-      currency: isIL ? 'ILS' : undefined,
+      market,
+      currency: market === 'IL' ? 'ILS' : undefined,
       _holding: holding,
       _metrics: metrics,
     }
@@ -691,6 +722,7 @@ export default function App() {
             onRefresh={refresh}
             loading={loading}
             stale={stale}
+            lastUpdated={lastUpdated}
             onSelectHolding={setSelected}
           />
         </div>

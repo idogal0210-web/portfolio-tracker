@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, test, expect, beforeEach } from 'vitest'
 import {
   isILStock,
+  isCrypto,
+  getMarket,
+  displaySymbol,
   formatCurrency,
   calculateTotals,
+  calculateAllTimeReturn,
   loadHoldings,
   saveHoldings,
   loadPricesCache,
@@ -22,6 +26,40 @@ describe('isILStock', () => {
   })
   it('returns false for empty string', () => {
     expect(isILStock('')).toBe(false)
+  })
+})
+
+describe('isCrypto', () => {
+  it('returns true for -USD suffix', () => {
+    expect(isCrypto('BTC-USD')).toBe(true)
+  })
+  it('returns true for lowercase -usd suffix', () => {
+    expect(isCrypto('eth-usd')).toBe(true)
+  })
+  it('returns false for plain US stock', () => {
+    expect(isCrypto('AAPL')).toBe(false)
+  })
+})
+
+describe('getMarket', () => {
+  it('classifies crypto', () => {
+    expect(getMarket('BTC-USD')).toBe('CRYPTO')
+  })
+  it('classifies IL', () => {
+    expect(getMarket('ELBT.TA')).toBe('IL')
+  })
+  it('defaults to US', () => {
+    expect(getMarket('AAPL')).toBe('US')
+  })
+})
+
+describe('displaySymbol', () => {
+  it('strips -USD suffix', () => {
+    expect(displaySymbol('BTC-USD')).toBe('BTC')
+  })
+  it('leaves plain tickers unchanged', () => {
+    expect(displaySymbol('AAPL')).toBe('AAPL')
+    expect(displaySymbol('ELBT.TA')).toBe('ELBT.TA')
   })
 })
 
@@ -65,6 +103,21 @@ describe('calculateTotals', () => {
   it('calculates US and IL percentages that sum to 100', () => {
     const result = calculateTotals(holdings, prices, exchangeRate)
     expect(result.usPct + result.ilPct).toBeCloseTo(100, 0)
+  })
+
+  it('classifies crypto holdings into cryptoValueUSD', () => {
+    const mixed = [
+      { symbol: 'AAPL', shares: 10, purchasePrice: 150 },
+      { symbol: 'BTC-USD', shares: 0.5, purchasePrice: 40000 },
+    ]
+    const mixedPrices = {
+      AAPL: { regularMarketPrice: 200, regularMarketChangePercent: 0 },
+      'BTC-USD': { regularMarketPrice: 60000, regularMarketChangePercent: 0 },
+    }
+    const result = calculateTotals(mixed, mixedPrices, exchangeRate)
+    expect(result.usValueUSD).toBeCloseTo(2000)
+    expect(result.cryptoValueUSD).toBeCloseTo(30000)
+    expect(result.cryptoPct + result.usPct + result.ilPct).toBeCloseTo(100, 0)
   })
 
   it('calculates gainUSD from today change', () => {
@@ -179,5 +232,27 @@ describe('calculateHoldingMetrics', () => {
     const result = calculateHoldingMetrics(noShares, 190)
     expect(result.currentValue).toBe(0)
     expect(result.adjustedCostBasis).toBe(0)
+  })
+})
+
+describe('calculateAllTimeReturn', () => {
+  const exchangeRate = 3.7
+  const holdings = [
+    { symbol: 'AAPL', shares: 10, purchasePrice: 150, fees: 0, dividends: 0 },
+  ]
+  const prices = {
+    AAPL: { regularMarketPrice: 200, regularMarketChangePercent: 0 },
+  }
+
+  it('computes total return and % from cost basis', () => {
+    const result = calculateAllTimeReturn(holdings, prices, exchangeRate)
+    expect(result.totalReturnUSD).toBeCloseTo(500)
+    expect(result.pct).toBeCloseTo((500 / 1500) * 100, 1)
+  })
+
+  it('returns 0% when cost basis is 0', () => {
+    const result = calculateAllTimeReturn([], {}, exchangeRate)
+    expect(result.pct).toBe(0)
+    expect(result.totalReturnUSD).toBe(0)
   })
 })
