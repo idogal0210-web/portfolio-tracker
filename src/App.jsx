@@ -3,9 +3,10 @@ import {
   isCrypto, getMarket, displaySymbol,
   formatCurrency, calculateTotals, calculateAllTimeReturn,
   loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
+  loadExchangeRate, saveExchangeRate,
   calculateHoldingMetrics
 } from './utils'
-import { fetchPrices } from './api'
+import { fetchPrices, fetchHistory } from './api'
 
 // ─── deterministic PRNG ───────────────────────────────────────────────────────
 function makeRand(seed) {
@@ -37,6 +38,31 @@ function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
   return raw.map(r => {
     const t = (r - lo) / ((hi - lo) || 1)
     return startPrice + t * (endPrice - startPrice)
+  })
+}
+
+function buildPortfolioReturnCurve(enriched, exchangeRate, numPts = 90) {
+  const now = Date.now()
+  const withDates = enriched
+    .filter(h => h._holding.purchaseDate && h._metrics)
+    .sort((a, b) => new Date(a._holding.purchaseDate) - new Date(b._holding.purchaseDate))
+
+  if (!withDates.length) return sparklinePoints(42, numPts)
+
+  const oldestDate = new Date(withDates[0]._holding.purchaseDate).getTime()
+  const span = now - oldestDate || 1
+
+  return Array.from({ length: numPts }, (_, i) => {
+    const pointTime = oldestDate + (i / (numPts - 1)) * span
+    let total = 0
+    for (const h of withDates) {
+      const t0 = new Date(h._holding.purchaseDate).getTime()
+      if (t0 > pointTime) continue
+      const progress = Math.min((pointTime - t0) / (now - t0 || 1), 1)
+      const factor = h.market === 'IL' ? 1 / exchangeRate : 1
+      total += (h._metrics.adjustedCostBasis + progress * (h._metrics.currentValue - h._metrics.adjustedCostBasis)) * factor
+    }
+    return total
   })
 }
 
@@ -181,7 +207,7 @@ function HoldingRow({ h, onClick }) {
 }
 
 // ─── HoldingDetail ────────────────────────────────────────────────────────────
-function HoldingDetail({ h, onBack }) {
+function HoldingDetail({ h, onBack, apiKey }) {
   const [range, setRange] = useState('1M')
   const isIL = h.market === 'IL'
   const currency = isIL ? 'ILS' : 'USD'
@@ -193,10 +219,18 @@ function HoldingDetail({ h, onBack }) {
     : (metrics?.effectiveCurrentPrice ?? 0) * 0.85
   const endPrice = metrics?.effectiveCurrentPrice ?? 0
 
-  const chartData = useMemo(
+  const syntheticData = useMemo(
     () => priceHistoryPoints(h.ticker, startPrice, endPrice, 90),
     [h.ticker, startPrice, endPrice]
   )
+  const [chartData, setChartData] = useState(syntheticData)
+
+  useEffect(() => {
+    if (!apiKey) return
+    fetchHistory(h.ticker, range, apiKey)
+      .then(data => { if (data.length >= 2) setChartData(data) })
+      .catch(() => {})
+  }, [h.ticker, range, apiKey])
 
   const isUp = (metrics?.totalReturn ?? 0) >= 0
   const accent = isUp ? '#22c55e' : '#ef4444'
@@ -337,7 +371,6 @@ function AddHoldingSheet({ onClose, onAdd }) {
   const [symbol, setSymbol] = useState('')
   const [shares, setShares] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
-  const [fees, setFees] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [error, setError] = useState('')
 
@@ -353,7 +386,7 @@ function AddHoldingSheet({ onClose, onAdd }) {
       symbol: sym,
       shares: qty,
       purchasePrice: parseFloat(purchasePrice) || 0,
-      fees: parseFloat(fees) || 0,
+      fees: 0,
       dividends: 0,
       purchaseDate,
     })
@@ -396,23 +429,17 @@ function AddHoldingSheet({ onClose, onAdd }) {
             </SheetField>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <SheetField label="Date">
-              <div className="relative">
-                <input className="sheet-input sheet-input-date" type="date"
-                  value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
-                {!purchaseDate && (
-                  <span className="absolute left-[14px] top-1/2 -translate-y-1/2 text-white/30 text-[14px] pointer-events-none select-none">
-                    Select date
-                  </span>
-                )}
-              </div>
-            </SheetField>
-            <SheetField label="Fees">
-              <input className="sheet-input" type="number" placeholder="0.00"
-                value={fees} onChange={e => setFees(e.target.value)} />
-            </SheetField>
-          </div>
+          <SheetField label="Date">
+            <div className="relative">
+              <input className="sheet-input sheet-input-date" type="date"
+                value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+              {!purchaseDate && (
+                <span className="absolute left-[14px] top-1/2 -translate-y-1/2 text-white/30 text-[14px] pointer-events-none select-none">
+                  Select date
+                </span>
+              )}
+            </div>
+          </SheetField>
         </div>
 
         <button onClick={handleSubmit}
@@ -498,7 +525,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   const gainColor = isGainUp ? '#22c55e' : '#ef4444'
   const isAllTimeUp = allTimePct >= 0
 
-  const chartData = useMemo(() => sparklinePoints(42, 90), [])
+  const chartData = useMemo(() => buildPortfolioReturnCurve(enriched, exchangeRate), [enriched, exchangeRate])
   const chartColor = isGainUp ? '#22c55e' : '#ef4444'
 
   const sorted = [...enriched].sort((a, b) => {
@@ -645,7 +672,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
 export default function App() {
   const [holdings, setHoldings] = useState(() => loadHoldings())
   const [prices, setPrices] = useState(() => loadPricesCache() ?? {})
-  const [exchangeRate, setExchangeRate] = useState(3.7)
+  const [exchangeRate, setExchangeRate] = useState(() => loadExchangeRate())
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
   const [currency, setCurrency] = useState('USD')
@@ -662,10 +689,15 @@ export default function App() {
     try {
       const symbols = holdings.map(h => h.symbol)
       const { priceMap, exchangeRate: rate } = await fetchPrices(symbols, apiKey)
-      setPrices(priceMap)
-      setExchangeRate(rate)
-      savePricesCache(priceMap)
-      setLastUpdated(Date.now())
+      if (Object.keys(priceMap).length > 0) {
+        setPrices(priceMap)
+        setExchangeRate(rate)
+        savePricesCache(priceMap)
+        saveExchangeRate(rate)
+        setLastUpdated(Date.now())
+      } else {
+        setStale(true)
+      }
     } catch (err) {
       console.error('Price fetch failed:', err)
       setStale(true)
@@ -712,12 +744,13 @@ export default function App() {
 
   return (
     <div className="bg-[#050505] text-white" style={{
-      minHeight: '100dvh',
+      height: '100dvh',
+      overflow: 'hidden',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       WebkitFontSmoothing: 'antialiased',
       backgroundImage: 'radial-gradient(at 85% 15%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(at 10% 85%, rgba(37,99,235,0.06), transparent 60%)',
     }}>
-      <div className="max-w-[430px] mx-auto relative" style={{ minHeight: '100dvh' }}>
+      <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
         <div className="absolute inset-0">
           <PortfolioScreen
             holdings={holdings}
@@ -742,6 +775,7 @@ export default function App() {
           <HoldingDetail
             h={selected}
             onBack={() => setSelected(null)}
+            apiKey={apiKey}
           />
         )}
 

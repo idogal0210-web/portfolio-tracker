@@ -110,7 +110,7 @@ export const loadHoldings = () => {
 }
 
 export const saveHoldings = (holdings) => {
-  localStorage.setItem(HOLDINGS_KEY, JSON.stringify(holdings))
+  try { localStorage.setItem(HOLDINGS_KEY, JSON.stringify(holdings)) } catch {}
 }
 
 export const loadPricesCache = () => {
@@ -123,7 +123,17 @@ export const loadPricesCache = () => {
 }
 
 export const savePricesCache = (prices) => {
-  localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices))
+  try { localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices)) } catch {}
+}
+
+const EXCHANGE_RATE_KEY = 'mystock_exchange_rate'
+
+export const loadExchangeRate = () => {
+  try { const v = parseFloat(localStorage.getItem(EXCHANGE_RATE_KEY)); return v > 0 ? v : 3.7 } catch { return 3.7 }
+}
+
+export const saveExchangeRate = (rate) => {
+  try { localStorage.setItem(EXCHANGE_RATE_KEY, String(rate)) } catch {}
 }
 
 // Prices for .TA symbols must be passed in agorot (API convention); conversion to shekels is done internally.
