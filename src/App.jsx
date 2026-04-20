@@ -112,7 +112,10 @@ function Sparkline({ data, color = '#22c55e', width = 52, height = 24 }) {
   )
 }
 
-function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
+function PriceChart({ data, color = '#22c55e', width = 360, height = 120, formatValue }) {
+  const [tooltip, setTooltip] = useState(null)
+  useEffect(() => setTooltip(null), [data])
+
   if (!data?.length) return <div style={{ width, height }} />
   const min = Math.min(...data), max = Math.max(...data)
   const range = max - min || 1
@@ -129,8 +132,27 @@ function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
   }
   const area = `${d} L${width} ${height} L0 ${height} Z`
   const id = `pc${color.replace(/[^a-z0-9]/gi, '')}`
+
+  const fmt = formatValue ?? (v => `$${v < 1 ? v.toFixed(4) : v.toFixed(2)}`)
+
+  const handleMove = (e) => {
+    e.preventDefault()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const relX = Math.max(0, Math.min(clientX - rect.left, width))
+    const idx = Math.max(0, Math.min(data.length - 1, Math.round((relX / width) * (data.length - 1))))
+    setTooltip({ x: pts[idx][0], y: pts[idx][1], value: data[idx] })
+  }
+
+  const tipW = 82
+  const tipH = 26
+  const tipX = tooltip ? Math.max(4, Math.min(tooltip.x - tipW / 2, width - tipW - 4)) : 0
+  const tipY = tooltip ? (tooltip.y < 44 ? tooltip.y + 10 : tooltip.y - tipH - 8) : 0
+
   return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
+    <svg width={width} height={height} style={{ display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+      onMouseMove={handleMove} onMouseLeave={() => setTooltip(null)}
+      onTouchMove={handleMove} onTouchEnd={() => setTooltip(null)}>
       <defs>
         <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />
@@ -139,6 +161,20 @@ function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
       </defs>
       <path d={area} fill={`url(#${id})`} />
       <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {tooltip && (
+        <>
+          <line x1={tooltip.x.toFixed(1)} y1={0} x2={tooltip.x.toFixed(1)} y2={height}
+            stroke="rgba(255,255,255,0.18)" strokeWidth="1" strokeDasharray="4,3" />
+          <circle cx={tooltip.x.toFixed(1)} cy={tooltip.y.toFixed(1)} r={4.5}
+            fill={color} stroke="#000" strokeWidth="2" />
+          <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={8}
+            fill="rgba(10,10,15,0.88)" stroke={`${color}55`} strokeWidth="1" />
+          <text x={tipX + tipW / 2} y={tipY + 17} fill="white" fontSize={11} fontWeight="700"
+            textAnchor="middle" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+            {fmt(tooltip.value)}
+          </text>
+        </>
+      )}
     </svg>
   )
 }
@@ -237,7 +273,7 @@ function HoldingDetail({ h, onBack, apiKey }) {
   const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}>
       {/* Sticky nav */}
       <div className="sticky top-0 z-10 px-4 pb-3 flex items-center gap-3"
         style={{
@@ -273,7 +309,8 @@ function HoldingDetail({ h, onBack, apiKey }) {
 
         {/* Chart */}
         <div className="mt-4 -mx-5">
-          <PriceChart data={chartData} color={accent} width={390} height={160} />
+          <PriceChart data={chartData} color={accent} width={390} height={160}
+            formatValue={v => formatCurrency(isIL ? v / 100 : v, currency)} />
         </div>
 
         {/* Range tabs */}
@@ -320,21 +357,21 @@ function HoldingDetail({ h, onBack, apiKey }) {
             <div className="text-[11px] font-semibold tracking-widest uppercase text-white/45 mb-2">Transactions</div>
             <div className="rounded-[18px] overflow-hidden bg-white/3 border border-white/5">
               <div className="flex items-center gap-3 px-4 py-3.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 text-[10px] font-bold">BUY</div>
-                <div className="flex-1">
-                  <div className="text-[13px] font-semibold">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 text-[10px] font-bold shrink-0">BUY</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold truncate">
                     {h.qty < 1 ? h.qty.toFixed(4) : h.qty} @ {metrics ? formatCurrency(
                       isIL ? (h._holding.purchasePrice / 100) : h._holding.purchasePrice, currency
                     ) : '—'}
                   </div>
                   {h._holding.purchaseDate && (
                     <div className="text-[11px] text-white/45 mt-0.5">
-                      {new Date(h._holding.purchaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(h._holding.purchaseDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}
                     </div>
                   )}
                 </div>
                 {metrics && (
-                  <div className="text-[13px] font-semibold tabular-nums">
+                  <div className="text-[13px] font-semibold tabular-nums shrink-0">
                     {formatCurrency(metrics.adjustedCostBasis, currency)}
                   </div>
                 )}
@@ -344,15 +381,6 @@ function HoldingDetail({ h, onBack, apiKey }) {
         ) : null}
       </div>
 
-      {/* Action bar */}
-      <div className="sticky bottom-0 px-5 pt-4 pb-8 flex gap-2.5"
-        style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0),#000 30%)' }}>
-        <button className="flex-1 h-12 rounded-2xl font-bold text-[14px] tracking-tight bg-white/8 text-white">Sell</button>
-        <button className="flex-1 h-12 rounded-2xl font-bold text-[14px] tracking-tight text-black"
-          style={{ background: accent, boxShadow: `0 8px 24px ${accent}44` }}>
-          Buy more
-        </button>
-      </div>
     </div>
   )
 }
@@ -469,17 +497,17 @@ function TabBar({ onAdd }) {
     </svg>
   )
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-2.5"
+    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-1"
       style={{
         background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)',
         backdropFilter: 'blur(12px)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
       }}>
       <TabBtn icon={tabIcon('M3 13l9-9 9 9M5 11v10h14V11', true)} label="Home" active />
       <TabBtn icon={tabIcon('M3 17l4-4 4 4 7-7 3 3', false)} label="Markets" />
       <div className="flex-1 flex justify-center">
         <button onClick={onAdd}
-          className="w-[52px] h-[52px] rounded-full flex items-center justify-center -translate-y-3 font-bold"
+          className="w-[48px] h-[48px] rounded-full flex items-center justify-center -translate-y-1 font-bold"
           style={{ background: '#22c55e', boxShadow: '0 6px 20px rgba(34,197,94,0.4)' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
@@ -615,7 +643,8 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
           </div>
           {/* Chart */}
           <div className="-mx-5">
-            <PriceChart data={chartData} color={chartColor} width={350} height={90} />
+            <PriceChart data={chartData} color={chartColor} width={350} height={90}
+              formatValue={v => formatCurrency(v, 'USD')} />
           </div>
           {/* Range tabs */}
           <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
