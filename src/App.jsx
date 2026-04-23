@@ -262,7 +262,7 @@ function HoldingRow({ h, onClick }) {
 }
 
 // ─── HoldingDetail ────────────────────────────────────────────────────────────
-function HoldingDetail({ h, onBack, apiKey }) {
+function HoldingDetail({ h, onBack, onDelete, apiKey }) {
   const [range, setRange] = useState('1M')
   const isIL = h.market === 'IL'
   const currency = isIL ? 'ILS' : 'USD'
@@ -369,6 +369,18 @@ function HoldingDetail({ h, onBack, apiKey }) {
               value={metrics ? formatCurrencyPrecise(metrics.breakEven, currency) : '—'} />
           </div>
         </div>
+
+        {/* Delete */}
+        <button
+          onClick={() => {
+            if (confirm(`Remove ${displaySymbol(h.ticker)} from your portfolio?`)) {
+              onDelete(h.ticker)
+              onBack()
+            }
+          }}
+          className="w-full h-[48px] mt-5 rounded-2xl font-bold text-[14px] tracking-tight border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/15 transition-colors">
+          Remove holding
+        </button>
 
         {/* Transactions */}
         {h._holding.purchaseDate || h._holding.purchasePrice ? (
@@ -583,7 +595,8 @@ const formatUpdatedAt = (date) => {
   return `Updated ${month} ${day}, ${year} · ${hh}:${mm}`
 }
 
-function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding }) {
+function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding, onDeleteHolding, onMoveHolding }) {
+  const [editMode, setEditMode] = useState(false)
   const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
   const [range, setRange] = useState('1M')
@@ -644,7 +657,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       <div className="px-5 pt-3 pb-1 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="text-[12px] text-white/45 font-medium">My Portfolio</div>
-          <div className="text-[28px] font-bold tracking-tight leading-tight">🔹 Overview</div>
+          <div className="text-[28px] font-bold tracking-tight leading-tight">Overview</div>
           {updatedText && (
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/45">
               <span className="relative inline-flex w-1.5 h-1.5">
@@ -727,7 +740,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
         <div className="mx-5 mt-3">
           <div className="glass-card-small p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[12px] font-bold uppercase tracking-widest text-white/70">🔹 Allocation</div>
+              <div className="text-[12px] font-bold uppercase tracking-widest text-white/70">Allocation</div>
               <div className="flex gap-0.5 p-0.5 rounded-lg bg-black/30">
                 {[['geo','Geo'],['asset','Asset'],['sector','Sector']].map(([key,label]) => (
                   <button key={key} onClick={() => setAllocTab(key)}
@@ -752,17 +765,47 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       )}
 
       {/* Holdings list */}
-      {sorted.length > 0 && (
+      {enriched.length > 0 && (
         <div className="mx-5 mt-4">
           <div className="flex items-baseline justify-between px-1 mb-2">
             <span className="text-[12px] font-bold uppercase tracking-widest text-white/70">
-              🔹 Holdings · {sorted.length}
+              Holdings · {enriched.length}
             </span>
-            <span className="text-[11px] text-white/40">Value ↓</span>
+            <button onClick={() => setEditMode(m => !m)}
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors ${editMode ? 'bg-emerald-500/20 text-emerald-400' : 'text-white/50 hover:text-white/80'}`}>
+              {editMode ? 'Done' : 'Edit'}
+            </button>
           </div>
           <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
-            {sorted.map(h => (
-              <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+            {(editMode ? enriched : sorted).map((h, i, arr) => (
+              editMode ? (
+                <div key={h.ticker} className="flex items-center gap-2 px-3 py-2">
+                  <div className="flex flex-col gap-0.5">
+                    <button disabled={i === 0} onClick={() => onMoveHolding(h.ticker, 'up')}
+                      className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
+                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 7l3-3 3 3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
+                    </button>
+                    <button disabled={i === arr.length - 1} onClick={() => onMoveHolding(h.ticker, 'down')}
+                      className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
+                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3l3 3 3-3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
+                    </button>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <Logo ticker={h.ticker} size={32} />
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
+                      <div className="text-[11px] text-white/40 truncate">{h.name}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    if (confirm(`Remove ${displaySymbol(h.ticker)}?`)) onDeleteHolding(h.ticker)
+                  }} className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-center">
+                    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              ) : (
+                <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+              )
             ))}
           </div>
         </div>
@@ -825,6 +868,17 @@ export default function App() {
     setPrices(prev => { const next = { ...prev }; delete next[symbol]; return next })
   }, [holdings])
 
+  const handleMove = useCallback((symbol, direction) => {
+    const idx = holdings.findIndex(h => h.symbol === symbol)
+    if (idx < 0) return
+    const target = direction === 'up' ? idx - 1 : idx + 1
+    if (target < 0 || target >= holdings.length) return
+    const updated = [...holdings]
+    ;[updated[idx], updated[target]] = [updated[target], updated[idx]]
+    setHoldings(updated)
+    saveHoldings(updated)
+  }, [holdings])
+
   // Bridge: enrich holdings with API data + metrics
   const enriched = useMemo(() => holdings.map(holding => {
     const priceData = prices[holding.symbol] ?? null
@@ -867,6 +921,8 @@ export default function App() {
             stale={stale}
             lastUpdated={lastUpdated}
             onSelectHolding={setSelected}
+            onDeleteHolding={handleDelete}
+            onMoveHolding={handleMove}
           />
         </div>
 
@@ -878,6 +934,7 @@ export default function App() {
           <HoldingDetail
             h={selected}
             onBack={() => setSelected(null)}
+            onDelete={handleDelete}
             apiKey={apiKey}
           />
         )}
