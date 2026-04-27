@@ -1,23 +1,24 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   isCrypto, getMarket, displaySymbol,
   formatCurrency, calculateTotals, calculateAllTimeReturn,
-  loadHoldings, clearLegacyHoldings, loadPricesCache, savePricesCache,
+  loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
   calculateHoldingMetrics,
   convertAmount, calculateMonthlyTotals, aggregateByCategory,
   groupTransactionsByDate, calculateMonthlyTrend, budgetProgress,
   materializeRecurring, toCSV, newId,
-  cacheLoad, cacheSave, cacheClearAll,
+  loadTransactions, saveTransactions,
+  loadBudgets, saveBudgets,
+  loadRecurring, saveRecurring,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
 } from './utils'
 import {
-  fetchPrices,
-  getSession, signOut, onAuthChange,
-  fetchHoldings, upsertHolding, deleteHoldingBySymbol,
-  fetchTransactions, upsertTransaction, bulkInsertTransactions, deleteTransaction,
-  fetchBudgets, upsertBudget, deleteBudget,
-  fetchRecurring, upsertRecurring, updateRecurringMaterialized, deleteRecurring,
-  fetchProfile, updateProfileCurrency,
+  fetchPrices, supabaseConfigured,
+  getSession, signInWithPassword, signUp, signOut, onAuthChange,
+  fetchHoldings, upsertHolding, deleteHoldingBySymbol, bulkUpsertHoldings,
+  fetchTransactions, upsertTransaction, deleteTransaction, bulkInsertTransactions,
+  fetchBudgets, upsertBudget, deleteBudget, bulkUpsertBudgets,
+  fetchRecurring, upsertRecurring, deleteRecurring, bulkUpsertRecurring,
 } from './api'
 
 // ─── deterministic PRNG ───────────────────────────────────────────────────────
@@ -1437,7 +1438,12 @@ function ActivityScreen({
 }
 
 // ─── YouScreen ────────────────────────────────────────────────────────────────
-function YouScreen({ currency, onToggleCurrency, onSignOut }) {
+function YouScreen({
+  currency, onToggleCurrency,
+  cloudAvailable, session, syncing,
+  onSignIn, onSignOut,
+}) {
+  const email = session?.user?.email
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
@@ -1459,11 +1465,131 @@ function YouScreen({ currency, onToggleCurrency, onSignOut }) {
             </button>
           </div>
         </div>
-        <button onClick={onSignOut}
-          className="w-full p-4 rounded-[20px] border border-rose-500/30 bg-rose-500/10 text-rose-300 font-semibold text-[14px] text-left">
-          Sign out
-        </button>
+
+        {cloudAvailable && (
+          <div className="glass-card-small p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45">Cloud sync</div>
+              {syncing && <div className="text-[10px] text-emerald-400">Syncing…</div>}
+            </div>
+            {session ? (
+              <>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 font-bold text-[14px]">
+                    {email?.[0]?.toUpperCase() || '·'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold truncate">{email}</div>
+                    <div className="text-[11px] text-emerald-400">Synced across devices</div>
+                  </div>
+                </div>
+                <button onClick={onSignOut}
+                  className="w-full h-10 rounded-xl border border-white/8 bg-white/4 text-white/80 font-semibold text-[12px]">
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-[12px] text-white/55 leading-relaxed mb-3">
+                  Optional: sign in to sync holdings, transactions, and budgets across all your devices.
+                </div>
+                <button onClick={onSignIn}
+                  className="w-full h-10 rounded-xl text-black font-bold text-[12px]"
+                  style={{ background: '#22c55e' }}>
+                  Sign in / Create account
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+// ─── AuthSheet ───────────────────────────────────────────────────────────────
+function AuthSheet({ onClose, onSignedIn }) {
+  const [mode, setMode] = useState('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(''); setInfo('')
+    if (!email || !password) return setError('Email and password are required')
+    setBusy(true)
+    try {
+      if (mode === 'signup') {
+        const session = await signUp(email, password)
+        if (session) { onSignedIn(session); onClose() }
+        else setInfo('Check your inbox to confirm your email, then sign in.')
+      } else {
+        const session = await signInWithPassword(email, password)
+        onSignedIn(session)
+        onClose()
+      }
+    } catch (err) {
+      setError(err?.message || 'Something went wrong')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <form onSubmit={handleSubmit} className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+        style={{
+          background: '#0E0E10',
+          boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)',
+        }}>
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[20px] font-bold tracking-tight">
+            {mode === 'signup' ? 'Create account' : 'Sign in'}
+          </span>
+          <button type="button" onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
+        </div>
+        <div className="text-[12px] text-white/50 leading-relaxed mb-4">
+          Your local data will be merged with the cloud on first sign-in.
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Email</div>
+            <input className="sheet-input" type="email" autoComplete="email"
+              value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Password</div>
+            <input className="sheet-input" type="password"
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+        </div>
+
+        {error && <p className="text-rose-400 text-xs mt-3">{error}</p>}
+        {info && <p className="text-emerald-400 text-xs mt-3">{info}</p>}
+
+        <button type="submit" disabled={busy}
+          className="w-full h-[48px] mt-5 rounded-2xl font-bold text-[14px] tracking-tight text-black disabled:opacity-50"
+          style={{ background: '#22c55e' }}>
+          {busy ? '…' : mode === 'signup' ? 'Create account' : 'Sign in'}
+        </button>
+
+        <div className="mt-4 text-center text-[12px] text-white/50">
+          {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button type="button" className="text-emerald-400 font-semibold"
+            onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setInfo('') }}>
+            {mode === 'signup' ? 'Sign in' : 'Create one'}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -1486,27 +1612,18 @@ function MarketsScreen() {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  // ── auth ──────────────────────────────────────────────────────────────────
-  const [session, setSession] = useState(null)
-  const userId = session?.user?.id ?? null
-
-  useEffect(() => {
-    getSession().then(setSession)
-    return onAuthChange(setSession)
-  }, [])
-
   // ── portfolio state ────────────────────────────────────────────────────────
-  const [holdings, setHoldings] = useState([])
-  const [prices, setPrices] = useState({})
+  const [holdings, setHoldings] = useState(() => loadHoldings())
+  const [prices, setPrices] = useState(() => loadPricesCache() ?? {})
   const [exchangeRate, setExchangeRate] = useState(3.7)
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
 
   // ── cash flow state ────────────────────────────────────────────────────────
-  const [transactions, setTransactions] = useState([])
-  const [budgets, setBudgets] = useState([])
-  const [recurring, setRecurring] = useState([])
+  const [transactions, setTransactions] = useState(() => loadTransactions())
+  const [budgets, setBudgets] = useState(() => loadBudgets())
+  const [recurring, setRecurring] = useState(() => loadRecurring())
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [currency, setCurrency] = useState('USD')
@@ -1517,85 +1634,87 @@ export default function App() {
   const [editingTxn, setEditingTxn] = useState(null)
   const [managingBudgets, setManagingBudgets] = useState(false)
   const [managingRecurring, setManagingRecurring] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+
+  // ── auth state (optional) ─────────────────────────────────────────────────
+  const [session, setSession] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const userId = session?.user?.id ?? null
+  const syncedForUser = useRef(null)
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
-  // ── data hydration ─────────────────────────────────────────────────────────
+  // ── materialize recurring on mount ────────────────────────────────────────
   useEffect(() => {
-    if (!userId) return
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const { newTxns, updatedTemplates } = materializeRecurring(recurring, todayIso)
+    if (newTxns.length > 0) {
+      setTransactions(prev => {
+        const next = [...prev, ...newTxns]
+        saveTransactions(next)
+        return next
+      })
+    }
+    if (updatedTemplates.length > 0) {
+      setRecurring(prev => {
+        const next = prev.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
+        saveRecurring(next)
+        return next
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Paint from cache immediately
-    const cachedHoldings = cacheLoad(userId, 'holdings', [])
-    const cachedTxns = cacheLoad(userId, 'transactions', [])
-    const cachedBudgets = cacheLoad(userId, 'budgets', [])
-    const cachedRecurring = cacheLoad(userId, 'recurring', [])
-    const cachedPrices = cacheLoad(userId, 'prices', {})
-    const cachedProfile = cacheLoad(userId, 'profile', null)
-    if (cachedHoldings.length) setHoldings(cachedHoldings)
-    if (cachedTxns.length) setTransactions(cachedTxns)
-    if (cachedBudgets.length) setBudgets(cachedBudgets)
-    if (cachedRecurring.length) setRecurring(cachedRecurring)
-    if (cachedPrices && Object.keys(cachedPrices).length) setPrices(cachedPrices)
-    if (cachedProfile?.currency) setCurrency(cachedProfile.currency)
+  // ── auth bootstrap ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!supabaseConfigured) return
+    getSession().then(setSession).catch(console.error)
+    return onAuthChange(setSession)
+  }, [])
 
-    // Fetch from Supabase
-    Promise.all([
-      fetchHoldings(),
-      fetchTransactions(),
-      fetchBudgets(),
-      fetchRecurring(),
-      fetchProfile(),
-    ]).then(([dbHoldings, dbTxns, dbBudgets, dbRecurring, dbProfile]) => {
-      // First-login migration: import legacy localStorage holdings
-      if (dbHoldings.length === 0) {
-        const legacy = loadHoldings()
-        if (legacy.length > 0) {
-          Promise.all(legacy.map(h => upsertHolding(h, userId)))
-            .then(imported => {
-              setHoldings(imported)
-              cacheSave(userId, 'holdings', imported)
-              clearLegacyHoldings()
-            })
-            .catch(console.error)
-        }
-      } else {
-        setHoldings(dbHoldings)
-        cacheSave(userId, 'holdings', dbHoldings)
+  // ── initial sync after sign-in: merge local + cloud ───────────────────────
+  useEffect(() => {
+    if (!userId || syncedForUser.current === userId) return
+    syncedForUser.current = userId
+    setSyncing(true)
+    ;(async () => {
+      try {
+        const [cloudH, cloudT, cloudB, cloudR] = await Promise.all([
+          fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
+        ])
+        const localH = loadHoldings()
+        const localT = loadTransactions()
+        const localB = loadBudgets()
+        const localR = loadRecurring()
+
+        const cloudSymbols = new Set(cloudH.map(h => h.symbol))
+        const localOnlyH = localH.filter(h => !cloudSymbols.has(h.symbol))
+        const cloudTxnIds = new Set(cloudT.map(t => t.id))
+        const localOnlyT = localT.filter(t => t.id && !cloudTxnIds.has(t.id))
+        const cloudCats = new Set(cloudB.map(b => b.category))
+        const localOnlyB = localB.filter(b => !cloudCats.has(b.category))
+        const cloudRIds = new Set(cloudR.map(r => r.id))
+        const localOnlyR = localR.filter(r => r.id && !cloudRIds.has(r.id))
+
+        await Promise.all([
+          localOnlyH.length ? bulkUpsertHoldings(localOnlyH, userId) : null,
+          localOnlyT.length ? bulkInsertTransactions(localOnlyT, userId) : null,
+          localOnlyB.length ? bulkUpsertBudgets(localOnlyB, userId) : null,
+          localOnlyR.length ? bulkUpsertRecurring(localOnlyR, userId) : null,
+        ].filter(Boolean))
+
+        const [finalH, finalT, finalB, finalR] = await Promise.all([
+          fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
+        ])
+        setHoldings(finalH); saveHoldings(finalH)
+        setTransactions(finalT); saveTransactions(finalT)
+        setBudgets(finalB); saveBudgets(finalB)
+        setRecurring(finalR); saveRecurring(finalR)
+      } catch (err) {
+        console.error('Initial sync failed:', err)
+      } finally {
+        setSyncing(false)
       }
-
-      setTransactions(dbTxns)
-      cacheSave(userId, 'transactions', dbTxns)
-
-      setBudgets(dbBudgets)
-      cacheSave(userId, 'budgets', dbBudgets)
-
-      setRecurring(dbRecurring)
-      cacheSave(userId, 'recurring', dbRecurring)
-
-      if (dbProfile?.currency) setCurrency(dbProfile.currency)
-      cacheSave(userId, 'profile', dbProfile)
-
-      // Materialize recurring templates
-      const todayIso = new Date().toISOString().slice(0, 10)
-      const { newTxns, updatedTemplates } = materializeRecurring(dbRecurring, todayIso)
-      if (newTxns.length > 0) {
-        bulkInsertTransactions(newTxns, userId).then(inserted => {
-          setTransactions(prev => {
-            const next = [...prev, ...inserted]
-            cacheSave(userId, 'transactions', next)
-            return next
-          })
-        }).catch(console.error)
-      }
-      if (updatedTemplates.length > 0) {
-        updatedTemplates.forEach(t => updateRecurringMaterialized(t.id, t.last_materialized_date))
-        setRecurring(prev => {
-          const next = prev.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
-          cacheSave(userId, 'recurring', next)
-          return next
-        })
-      }
-    }).catch(console.error)
+    })()
   }, [userId])
 
   // ── price refresh ──────────────────────────────────────────────────────────
@@ -1606,7 +1725,6 @@ export default function App() {
       const { priceMap, exchangeRate: rate } = await fetchPrices(holdings.map(h => h.symbol), apiKey)
       setPrices(priceMap)
       setExchangeRate(rate)
-      if (userId) cacheSave(userId, 'prices', priceMap)
       savePricesCache(priceMap)
       setLastUpdated(Date.now())
     } catch {
@@ -1614,100 +1732,91 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [holdings, apiKey, userId])
+  }, [holdings, apiKey])
 
   useEffect(() => { refresh() }, [refresh])
 
   // ── holdings handlers ──────────────────────────────────────────────────────
-  const handleAdd = useCallback(async (holding) => {
+  const handleAdd = useCallback((holding) => {
     if (holdings.find(h => h.symbol === holding.symbol)) return
-    const saved = userId
-      ? await upsertHolding(holding, userId).catch(() => ({ ...holding, id: newId() }))
-      : { ...holding, id: newId() }
+    const withId = { ...holding, id: newId() }
     setHoldings(prev => {
-      const next = [...prev, saved]
-      if (userId) cacheSave(userId, 'holdings', next)
+      const next = [...prev, withId]
+      saveHoldings(next)
       return next
     })
+    if (userId) upsertHolding(withId, userId).catch(console.error)
   }, [holdings, userId])
 
-  const handleDelete = useCallback(async (symbol) => {
-    if (userId) deleteHoldingBySymbol(symbol, userId).catch(console.error)
+  const handleDelete = useCallback((symbol) => {
     setHoldings(prev => {
       const next = prev.filter(h => h.symbol !== symbol)
-      if (userId) cacheSave(userId, 'holdings', next)
+      saveHoldings(next)
       return next
     })
     setPrices(prev => { const next = { ...prev }; delete next[symbol]; return next })
+    if (userId) deleteHoldingBySymbol(symbol, userId).catch(console.error)
   }, [userId])
 
   // ── transaction handlers ───────────────────────────────────────────────────
-  const handleSaveTxn = useCallback(async (txn) => {
+  const handleSaveTxn = useCallback((txn) => {
     const isNew = !txn.id
     const withId = isNew ? { ...txn, id: newId(), createdAt: Date.now() } : txn
-    // optimistic
     setTransactions(prev => {
       const next = isNew ? [...prev, withId] : prev.map(t => t.id === withId.id ? withId : t)
-      if (userId) cacheSave(userId, 'transactions', next)
+      saveTransactions(next)
       return next
     })
-    if (userId) {
-      upsertTransaction(withId, userId).then(saved => {
-        setTransactions(prev => {
-          const next = prev.map(t => t.id === withId.id ? saved : t)
-          cacheSave(userId, 'transactions', next)
-          return next
-        })
-      }).catch(console.error)
-    }
+    if (userId) upsertTransaction(withId, userId).catch(console.error)
   }, [userId])
 
-  const handleDeleteTxn = useCallback(async (id) => {
+  const handleDeleteTxn = useCallback((id) => {
     setTransactions(prev => {
       const next = prev.filter(t => t.id !== id)
-      if (userId) cacheSave(userId, 'transactions', next)
+      saveTransactions(next)
       return next
     })
     if (userId) deleteTransaction(id).catch(console.error)
   }, [userId])
 
   // ── budget handlers ────────────────────────────────────────────────────────
-  const handleSaveBudget = useCallback(async (budget) => {
+  const handleSaveBudget = useCallback((budget) => {
+    const withId = budget.id ? budget : { id: newId(), ...budget }
     setBudgets(prev => {
-      const next = prev.find(b => b.category === budget.category)
-        ? prev.map(b => b.category === budget.category ? { ...b, ...budget } : b)
-        : [...prev, { id: newId(), ...budget }]
-      if (userId) cacheSave(userId, 'budgets', next)
+      const next = prev.find(b => b.category === withId.category)
+        ? prev.map(b => b.category === withId.category ? { ...b, ...withId } : b)
+        : [...prev, withId]
+      saveBudgets(next)
       return next
     })
-    if (userId) upsertBudget(budget, userId).catch(console.error)
+    if (userId) upsertBudget(withId, userId).catch(console.error)
   }, [userId])
 
-  const handleDeleteBudget = useCallback(async (category) => {
+  const handleDeleteBudget = useCallback((category) => {
     setBudgets(prev => {
       const next = prev.filter(b => b.category !== category)
-      if (userId) cacheSave(userId, 'budgets', next)
+      saveBudgets(next)
       return next
     })
     if (userId) deleteBudget(category, userId).catch(console.error)
   }, [userId])
 
   // ── recurring handlers ─────────────────────────────────────────────────────
-  const handleSaveRecurring = useCallback(async (template) => {
+  const handleSaveRecurring = useCallback((template) => {
     const isNew = !template.id
-    const withId = isNew ? { ...template, id: newId(), user_id: userId } : template
+    const withId = isNew ? { ...template, id: newId() } : template
     setRecurring(prev => {
       const next = isNew ? [...prev, withId] : prev.map(t => t.id === withId.id ? withId : t)
-      if (userId) cacheSave(userId, 'recurring', next)
+      saveRecurring(next)
       return next
     })
     if (userId) upsertRecurring(withId, userId).catch(console.error)
   }, [userId])
 
-  const handleDeleteRecurring = useCallback(async (id) => {
+  const handleDeleteRecurring = useCallback((id) => {
     setRecurring(prev => {
       const next = prev.filter(t => t.id !== id)
-      if (userId) cacheSave(userId, 'recurring', next)
+      saveRecurring(next)
       return next
     })
     if (userId) deleteRecurring(id).catch(console.error)
@@ -1715,21 +1824,15 @@ export default function App() {
 
   // ── currency toggle ────────────────────────────────────────────────────────
   const toggleCurrency = useCallback(() => {
-    setCurrency(c => {
-      const next = c === 'USD' ? 'ILS' : 'USD'
-      if (userId) updateProfileCurrency(next, userId).catch(console.error)
-      return next
-    })
-  }, [userId])
+    setCurrency(c => c === 'USD' ? 'ILS' : 'USD')
+  }, [])
 
-  // ── sign out ───────────────────────────────────────────────────────────────
+  // ── sign out (keeps local data) ───────────────────────────────────────────
   const handleSignOut = useCallback(async () => {
-    if (userId) cacheClearAll(userId)
-    await signOut()
+    try { await signOut() } catch (e) { console.error(e) }
+    syncedForUser.current = null
     setSession(null)
-    setHoldings([]); setTransactions([]); setBudgets([]); setRecurring([])
-    setPrices({}); setActiveTab('home')
-  }, [userId])
+  }, [])
 
   // ── CSV export ─────────────────────────────────────────────────────────────
   const handleExportCsv = useCallback(() => {
@@ -1799,7 +1902,13 @@ export default function App() {
           )}
           {activeTab === 'markets' && <MarketsScreen />}
           {activeTab === 'you' && (
-            <YouScreen currency={currency} onToggleCurrency={toggleCurrency} onSignOut={handleSignOut} />
+            <YouScreen
+              currency={currency} onToggleCurrency={toggleCurrency}
+              cloudAvailable={supabaseConfigured}
+              session={session} syncing={syncing}
+              onSignIn={() => setShowAuth(true)}
+              onSignOut={handleSignOut}
+            />
           )}
         </div>
 
@@ -1836,6 +1945,13 @@ export default function App() {
             onClose={() => setManagingRecurring(false)}
             onSave={handleSaveRecurring}
             onDelete={handleDeleteRecurring}
+          />
+        )}
+
+        {showAuth && (
+          <AuthSheet
+            onClose={() => setShowAuth(false)}
+            onSignedIn={setSession}
           />
         )}
       </div>

@@ -1,7 +1,7 @@
 import { supabase, supabaseConfigured } from './supabase'
 
 // ────────────────────────────────────────────────────────────────────────────
-// External: RapidAPI Yahoo Finance — unchanged
+// External: RapidAPI Yahoo Finance
 // ────────────────────────────────────────────────────────────────────────────
 
 const API_HOST = 'apidojo-yahoo-finance-v1.p.rapidapi.com'
@@ -34,10 +34,6 @@ export async function fetchPrices(symbols, apiKey) {
   }
   return { priceMap, exchangeRate }
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Supabase guard — every API function aborts cleanly if env is missing
-// ────────────────────────────────────────────────────────────────────────────
 
 export { supabaseConfigured }
 
@@ -80,7 +76,7 @@ export function onAuthChange(callback) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Holdings — maps DB snake_case ↔ existing camelCase shape
+// Holdings
 // ────────────────────────────────────────────────────────────────────────────
 
 const fromDbHolding = (row) => ({
@@ -105,9 +101,7 @@ const toDbHolding = (h, userId) => ({
 
 export async function fetchHoldings() {
   const { data, error } = await requireClient()
-    .from('holdings')
-    .select('*')
-    .order('created_at', { ascending: true })
+    .from('holdings').select('*').order('created_at', { ascending: true })
   if (error) throw error
   return (data ?? []).map(fromDbHolding)
 }
@@ -117,8 +111,7 @@ export async function upsertHolding(holding, userId) {
   const { data, error } = await requireClient()
     .from('holdings')
     .upsert(payload, { onConflict: 'user_id,symbol' })
-    .select()
-    .single()
+    .select().single()
   if (error) throw error
   return fromDbHolding(data)
 }
@@ -128,6 +121,17 @@ export async function deleteHoldingBySymbol(symbol, userId) {
     .from('holdings').delete()
     .eq('user_id', userId).eq('symbol', symbol)
   if (error) throw error
+}
+
+export async function bulkUpsertHoldings(holdings, userId) {
+  if (!holdings?.length) return []
+  const payload = holdings.map(h => toDbHolding(h, userId))
+  const { data, error } = await requireClient()
+    .from('holdings')
+    .upsert(payload, { onConflict: 'user_id,symbol' })
+    .select()
+  if (error) throw error
+  return (data ?? []).map(fromDbHolding)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -163,9 +167,7 @@ const toDbTransaction = (t, userId) => {
 
 export async function fetchTransactions() {
   const { data, error } = await requireClient()
-    .from('transactions')
-    .select('*')
-    .order('date', { ascending: false })
+    .from('transactions').select('*').order('date', { ascending: false })
   if (error) throw error
   return (data ?? []).map(fromDbTransaction)
 }
@@ -173,10 +175,7 @@ export async function fetchTransactions() {
 export async function upsertTransaction(txn, userId) {
   const payload = toDbTransaction(txn, userId)
   const { data, error } = await requireClient()
-    .from('transactions')
-    .upsert(payload)
-    .select()
-    .single()
+    .from('transactions').upsert(payload).select().single()
   if (error) throw error
   return fromDbTransaction(data)
 }
@@ -185,7 +184,7 @@ export async function bulkInsertTransactions(txns, userId) {
   if (!txns?.length) return []
   const payload = txns.map(t => toDbTransaction(t, userId))
   const { data, error } = await requireClient()
-    .from('transactions').insert(payload).select()
+    .from('transactions').upsert(payload).select()
   if (error) throw error
   return (data ?? []).map(fromDbTransaction)
 }
@@ -206,6 +205,13 @@ const fromDbBudget = (row) => ({
   currency: row.currency,
 })
 
+const toDbBudget = (b, userId) => ({
+  user_id: userId,
+  category: b.category,
+  amount: b.amount,
+  currency: b.currency,
+})
+
 export async function fetchBudgets() {
   const { data, error } = await requireClient()
     .from('budgets').select('*').order('category', { ascending: true })
@@ -214,18 +220,23 @@ export async function fetchBudgets() {
 }
 
 export async function upsertBudget(budget, userId) {
-  const payload = {
-    user_id: userId,
-    category: budget.category,
-    amount: budget.amount,
-    currency: budget.currency,
-  }
   const { data, error } = await requireClient()
     .from('budgets')
-    .upsert(payload, { onConflict: 'user_id,category' })
+    .upsert(toDbBudget(budget, userId), { onConflict: 'user_id,category' })
     .select().single()
   if (error) throw error
   return fromDbBudget(data)
+}
+
+export async function bulkUpsertBudgets(budgets, userId) {
+  if (!budgets?.length) return []
+  const payload = budgets.map(b => toDbBudget(b, userId))
+  const { data, error } = await requireClient()
+    .from('budgets')
+    .upsert(payload, { onConflict: 'user_id,category' })
+    .select()
+  if (error) throw error
+  return (data ?? []).map(fromDbBudget)
 }
 
 export async function deleteBudget(category, userId) {
@@ -253,6 +264,23 @@ const fromDbRecurring = (row) => ({
   active: row.active !== false,
 })
 
+const toDbRecurring = (t, userId) => {
+  const out = {
+    user_id: userId,
+    type: t.type,
+    amount: t.amount,
+    currency: t.currency,
+    category: t.category,
+    note: t.note ?? '',
+    cadence: t.cadence,
+    start_date: t.start_date,
+    last_materialized_date: t.last_materialized_date ?? null,
+    active: t.active !== false,
+  }
+  if (t.id) out.id = t.id
+  return out
+}
+
 export async function fetchRecurring() {
   const { data, error } = await requireClient()
     .from('recurring_templates').select('*').order('created_at', { ascending: true })
@@ -261,53 +289,23 @@ export async function fetchRecurring() {
 }
 
 export async function upsertRecurring(template, userId) {
-  const payload = {
-    user_id: userId,
-    type: template.type,
-    amount: template.amount,
-    currency: template.currency,
-    category: template.category,
-    note: template.note ?? '',
-    cadence: template.cadence,
-    start_date: template.start_date,
-    last_materialized_date: template.last_materialized_date ?? null,
-    active: template.active !== false,
-  }
-  if (template.id) payload.id = template.id
   const { data, error } = await requireClient()
-    .from('recurring_templates').upsert(payload).select().single()
+    .from('recurring_templates').upsert(toDbRecurring(template, userId)).select().single()
   if (error) throw error
   return fromDbRecurring(data)
 }
 
-export async function updateRecurringMaterialized(id, lastDate) {
-  const { error } = await requireClient()
-    .from('recurring_templates')
-    .update({ last_materialized_date: lastDate })
-    .eq('id', id)
+export async function bulkUpsertRecurring(templates, userId) {
+  if (!templates?.length) return []
+  const payload = templates.map(t => toDbRecurring(t, userId))
+  const { data, error } = await requireClient()
+    .from('recurring_templates').upsert(payload).select()
   if (error) throw error
+  return (data ?? []).map(fromDbRecurring)
 }
 
 export async function deleteRecurring(id) {
   const { error } = await requireClient()
     .from('recurring_templates').delete().eq('id', id)
-  if (error) throw error
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Profile
-// ────────────────────────────────────────────────────────────────────────────
-
-export async function fetchProfile() {
-  const { data, error } = await requireClient()
-    .from('profiles').select('*').single()
-  if (error && error.code !== 'PGRST116') throw error
-  return data || null
-}
-
-export async function updateProfileCurrency(currency, userId) {
-  const { error } = await requireClient()
-    .from('profiles')
-    .upsert({ id: userId, currency })
   if (error) throw error
 }

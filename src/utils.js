@@ -336,11 +336,14 @@ export const toCSV = (transactions, displayCurrency, exchangeRate) => {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// LocalStorage — legacy (global) keys, kept for first-login migration
+// LocalStorage helpers
 // ────────────────────────────────────────────────────────────────────────────
 
 const HOLDINGS_KEY = 'mystock_holdings'
 const PRICES_CACHE_KEY = 'mystock_prices_cache'
+const TRANSACTIONS_KEY = 'mystock_transactions'
+const BUDGETS_KEY = 'mystock_budgets'
+const RECURRING_KEY = 'mystock_recurring'
 
 export const loadHoldings = () => {
   try {
@@ -391,34 +394,24 @@ export const saveExchangeRate = (rate) => {
   try { localStorage.setItem(EXCHANGE_RATE_KEY, String(rate)) } catch {}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// LocalStorage — namespaced per-user write-through cache
-// ────────────────────────────────────────────────────────────────────────────
-
-const cacheKey = (userId, kind) => `mystock_u_${userId}_${kind}`
-
-export const cacheLoad = (userId, kind, fallback = null) => {
-  if (!userId) return fallback
+const lsLoad = (key, fallback) => {
   try {
-    const raw = localStorage.getItem(cacheKey(userId, kind))
+    const raw = localStorage.getItem(key)
     return raw ? JSON.parse(raw) : fallback
   } catch {
     return fallback
   }
 }
 
-export const cacheSave = (userId, kind, data) => {
-  if (!userId) return
-  try {
-    localStorage.setItem(cacheKey(userId, kind), JSON.stringify(data))
-  } catch {
-    // storage full or disabled — caller should handle if critical
-  }
+const lsSave = (key, data) => {
+  try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
 }
 
-export const cacheClearAll = (userId) => {
-  if (!userId) return
-  for (const kind of ['holdings', 'transactions', 'budgets', 'recurring', 'prices', 'profile']) {
-    localStorage.removeItem(cacheKey(userId, kind))
-  }
-}
+export const loadTransactions = () => lsLoad(TRANSACTIONS_KEY, [])
+export const saveTransactions = (data) => lsSave(TRANSACTIONS_KEY, data)
+
+export const loadBudgets = () => lsLoad(BUDGETS_KEY, [])
+export const saveBudgets = (data) => lsSave(BUDGETS_KEY, data)
+
+export const loadRecurring = () => lsLoad(RECURRING_KEY, [])
+export const saveRecurring = (data) => lsSave(RECURRING_KEY, data)
