@@ -143,6 +143,41 @@ export const saveExchangeRate = (rate) => {
   try { localStorage.setItem(EXCHANGE_RATE_KEY, String(rate)) } catch {}
 }
 
+const TRANSACTIONS_KEY = 'mystock_transactions'
+const BANK_BALANCE_KEY = 'mystock_bank_balance'
+
+export const loadTransactions = () => {
+  try {
+    const raw = localStorage.getItem(TRANSACTIONS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+export const saveTransactions = (txs) => {
+  try { localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(txs)) } catch {}
+}
+
+export const loadBankBalance = () => {
+  try { const v = parseFloat(localStorage.getItem(BANK_BALANCE_KEY)); return Number.isFinite(v) ? v : 0 } catch { return 0 }
+}
+
+export const saveBankBalance = (v) => {
+  try { localStorage.setItem(BANK_BALANCE_KEY, String(v)) } catch {}
+}
+
+export const summarizeMonth = (transactions, ref = new Date()) => {
+  const y = ref.getFullYear(), m = ref.getMonth()
+  let income = 0, expense = 0
+  for (const t of transactions) {
+    const d = new Date(t.date)
+    if (d.getFullYear() !== y || d.getMonth() !== m) continue
+    const amt = Number(t.amount) || 0
+    if (t.type === 'income') income += amt
+    else if (t.type === 'expense') expense += amt
+  }
+  return { income, expense, net: income - expense }
+}
+
 // Prices for .TA symbols must be passed in agorot (API convention); conversion to shekels is done internally.
 // Crypto (-USD) and US stocks are passed through as-is.
 export const calculateHoldingMetrics = (holding, currentApiPrice) => {

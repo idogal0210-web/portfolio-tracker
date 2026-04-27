@@ -546,10 +546,10 @@ function SheetField({ label, children }) {
 }
 
 // ─── TabBar ───────────────────────────────────────────────────────────────────
-function TabBar({ onAdd }) {
-  const tabIcon = (path, active) => (
+function TabBar({ active, onChange, onAdd }) {
+  const tabIcon = (path, on) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <path d={path} stroke={active ? '#22c55e' : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={path} stroke={on ? '#22c55e' : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
   return (
@@ -559,8 +559,8 @@ function TabBar({ onAdd }) {
         backdropFilter: 'blur(12px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
       }}>
-      <TabBtn icon={tabIcon('M3 13l9-9 9 9M5 11v10h14V11', true)} label="Home" active />
-      <TabBtn icon={tabIcon('M3 17l4-4 4 4 7-7 3 3', false)} label="Markets" />
+      <TabBtn icon={tabIcon('M3 13l9-9 9 9M5 11v10h14V11', active === 'home')} label="Home" active={active === 'home'} onClick={() => onChange('home')} />
+      <TabBtn icon={tabIcon('M3 17l4-4 4 4 7-7 3 3', active === 'markets')} label="Markets" active={active === 'markets'} onClick={() => onChange('markets')} />
       <div className="flex-1 flex justify-center">
         <button onClick={onAdd}
           className="w-[48px] h-[48px] rounded-full flex items-center justify-center -translate-y-1 font-bold"
@@ -570,19 +570,19 @@ function TabBar({ onAdd }) {
           </svg>
         </button>
       </div>
-      <TabBtn icon={tabIcon('M3 6h18M3 12h18M3 18h18', false)} label="Activity" />
-      <TabBtn icon={tabIcon('M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6', false)} label="You" />
+      <TabBtn icon={tabIcon('M3 6h18M3 12h18M3 18h18', active === 'activity')} label="Activity" active={active === 'activity'} onClick={() => onChange('activity')} />
+      <TabBtn icon={tabIcon('M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6', active === 'you')} label="You" active={active === 'you'} onClick={() => onChange('you')} />
     </div>
   )
 }
 
-function TabBtn({ icon, label, active }) {
+function TabBtn({ icon, label, active, onClick }) {
   return (
-    <div className="flex-1 flex flex-col items-center gap-1">
+    <button onClick={onClick} className="flex-1 flex flex-col items-center gap-1">
       {icon}
       <span className={`text-[10px] font-semibold ${active ? 'text-emerald-400' : 'text-white/30'}`}>{label}</span>
-      {active && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
-    </div>
+      {active ? <div className="w-1 h-1 rounded-full bg-emerald-400" /> : <div className="w-1 h-1" />}
+    </button>
   )
 }
 
@@ -817,6 +817,230 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   )
 }
 
+// ─── HomeScreen ──────────────────────────────────────────────────────────────
+const INCOME_CATEGORIES = ['Salary', 'Bonus', 'Freelance', 'Dividends', 'Gift', 'Other']
+const EXPENSE_CATEGORIES = ['Rent', 'Groceries', 'Transport', 'Bills', 'Dining', 'Shopping', 'Health', 'Other']
+
+function HomeScreen({ bankBalance, onEditBank, transactions, onAddTx, onDeleteTx }) {
+  const { income, expense, net } = summarizeMonth(transactions)
+  const totalBalance = bankBalance + net
+  const monthLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  const recent = [...transactions]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 8)
+
+  return (
+    <div className="overflow-y-auto no-scrollbar" style={{
+      height: '100%',
+      paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
+      paddingTop: 'env(safe-area-inset-top)',
+    }}>
+      <div className="px-5 pt-3 pb-1 flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] text-white/45 font-medium">Cash Flow</div>
+          <div className="text-[28px] font-bold tracking-tight leading-tight">Home</div>
+          <div className="text-[11px] text-white/40 mt-1">{monthLabel}</div>
+        </div>
+        <button onClick={onAddTx}
+          className="mt-5 h-9 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-white font-semibold text-[12px] flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+          Add
+        </button>
+      </div>
+
+      {/* Hero: Total balance */}
+      <div className="mx-5 mt-4">
+        <div className="glass-card p-5">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Total balance</div>
+          <div className="text-[44px] font-bold tracking-tighter leading-none tabular-nums mb-3">
+            {formatCurrency(totalBalance, 'ILS')}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full tabular-nums"
+              style={{ color: net >= 0 ? '#22c55e' : '#ef4444', background: net >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)' }}>
+              {net >= 0 ? '+' : ''}{formatCurrency(net, 'ILS')} this month
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Two stat cards */}
+      <div className="mx-5 mt-3 grid grid-cols-2 gap-3">
+        <button onClick={onEditBank} className="glass-card-small p-4 text-left transition-colors hover:bg-white/5">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Checking</div>
+          <div className="text-[22px] font-bold tracking-tight tabular-nums">{formatCurrency(bankBalance, 'ILS')}</div>
+          <div className="text-[10px] text-white/35 mt-1">Tap to edit</div>
+        </button>
+        <div className="glass-card-small p-4">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Income · month</div>
+          <div className="text-[22px] font-bold tracking-tight tabular-nums text-emerald-400">{formatCurrency(income, 'ILS')}</div>
+          <div className="text-[10px] text-white/35 mt-1">Expenses {formatCurrency(expense, 'ILS')}</div>
+        </div>
+      </div>
+
+      {/* Recent transactions */}
+      <div className="mx-5 mt-5">
+        <div className="flex items-baseline justify-between px-1 mb-2">
+          <span className="text-[12px] font-bold uppercase tracking-widest text-white/70">Recent activity</span>
+          <span className="text-[11px] text-white/40">{transactions.length} total</span>
+        </div>
+        {recent.length === 0 ? (
+          <div className="rounded-[22px] border border-white/5 bg-white/3 p-6 text-center">
+            <div className="text-[13px] text-white/55 font-semibold mb-1">No entries yet</div>
+            <div className="text-[11px] text-white/35">Tap Add to record income or an expense.</div>
+          </div>
+        ) : (
+          <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
+            {recent.map(t => {
+              const isIncome = t.type === 'income'
+              const color = isIncome ? '#22c55e' : '#ef4444'
+              return (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: isIncome ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)' }}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d={isIncome ? 'M7 11V3M3 7l4-4 4 4' : 'M7 3v8M3 7l4 4 4-4'}
+                        stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-semibold truncate">{t.category}</div>
+                    <div className="text-[11px] text-white/40 truncate">
+                      {new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                      {t.note ? ` · ${t.note}` : ''}
+                    </div>
+                  </div>
+                  <div className="text-[14px] font-bold tabular-nums" style={{ color }}>
+                    {isIncome ? '+' : '−'}{formatCurrency(Number(t.amount) || 0, 'ILS')}
+                  </div>
+                  <button onClick={() => onDeleteTx(t.id)}
+                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-rose-500/15 hover:text-rose-400 text-white/40 flex items-center justify-center transition-colors">
+                    <svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── AddTransactionSheet ─────────────────────────────────────────────────────
+function AddTransactionSheet({ onClose, onSave }) {
+  const [type, setType] = useState('expense')
+  const [category, setCategory] = useState('Groceries')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [note, setNote] = useState('')
+  const [error, setError] = useState('')
+
+  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  useEffect(() => {
+    if (!categories.includes(category)) setCategory(categories[0])
+  }, [type])
+
+  function handleSubmit() {
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0) return setError('Enter a valid amount')
+    if (!date) return setError('Pick a date')
+    setError('')
+    onSave({ id: Date.now().toString(36), type, category, amount: amt, date, note: note.trim() })
+    onClose()
+  }
+
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div className="relative text-white rounded-t-[28px] p-5"
+        style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[20px] font-bold tracking-tight">New entry</span>
+          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
+        </div>
+
+        <div className="flex gap-1 p-1 rounded-xl bg-white/4 mb-4">
+          {[['expense','Expense'],['income','Income']].map(([k,l]) => (
+            <button key={k} onClick={() => setType(k)}
+              className={`flex-1 py-2 rounded-lg text-[12px] font-bold transition-colors ${type === k
+                ? (k === 'income' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400')
+                : 'text-white/45'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {error && <p className="text-rose-400 text-xs mb-3">{error}</p>}
+
+        <div className="space-y-3">
+          <SheetField label="Amount (₪)">
+            <input className="sheet-input" type="number" inputMode="decimal" placeholder="0.00"
+              value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
+          </SheetField>
+
+          <SheetField label="Category">
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map(c => (
+                <button key={c} onClick={() => setCategory(c)}
+                  className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${category === c
+                    ? 'bg-white/12 text-white border border-white/15'
+                    : 'bg-white/3 text-white/50 border border-white/5'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </SheetField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <SheetField label="Date">
+              <input className="sheet-input sheet-input-date" type="date"
+                value={date} onChange={e => setDate(e.target.value)} />
+            </SheetField>
+            <SheetField label="Note (optional)">
+              <input className="sheet-input" placeholder="..." value={note} onChange={e => setNote(e.target.value)} />
+            </SheetField>
+          </div>
+        </div>
+
+        <button onClick={handleSubmit}
+          className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
+          style={{ background: type === 'income' ? '#22c55e' : '#ef4444', boxShadow: `0 10px 30px ${type === 'income' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+          Save {type}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── BankEditSheet ───────────────────────────────────────────────────────────
+function BankEditSheet({ initial, onClose, onSave }) {
+  const [value, setValue] = useState(String(initial ?? 0))
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div className="relative text-white rounded-t-[28px] p-5"
+        style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[20px] font-bold tracking-tight">Checking balance</span>
+          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
+        </div>
+        <SheetField label="Current balance (₪)">
+          <input className="sheet-input" type="number" inputMode="decimal" autoFocus
+            value={value} onChange={e => setValue(e.target.value)} />
+        </SheetField>
+        <button onClick={() => { onSave(parseFloat(value) || 0); onClose() }}
+          className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
+          style={{ background: '#22c55e', boxShadow: '0 10px 30px rgba(34,197,94,0.3)' }}>
+          Save
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const [holdings, setHoldings] = useState(() => loadHoldings())
@@ -828,6 +1052,25 @@ export default function App() {
   const [selected, setSelected] = useState(null)
   const [adding, setAdding] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [activeTab, setActiveTab] = useState('markets')
+  const [transactions, setTransactions] = useState(() => loadTransactions())
+  const [bankBalance, setBankBalance] = useState(() => loadBankBalance())
+  const [addingTx, setAddingTx] = useState(false)
+  const [editingBank, setEditingBank] = useState(false)
+
+  const handleSaveTx = useCallback((tx) => {
+    const updated = [tx, ...transactions]
+    setTransactions(updated); saveTransactions(updated)
+  }, [transactions])
+
+  const handleDeleteTx = useCallback((id) => {
+    const updated = transactions.filter(t => t.id !== id)
+    setTransactions(updated); saveTransactions(updated)
+  }, [transactions])
+
+  const handleSaveBank = useCallback((v) => {
+    setBankBalance(v); saveBankBalance(v)
+  }, [])
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
@@ -912,25 +1155,39 @@ export default function App() {
     }}>
       <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
         <div className="absolute inset-0">
-          <PortfolioScreen
-            holdings={holdings}
-            enriched={enriched}
-            prices={prices}
-            exchangeRate={exchangeRate}
-            currency={currency}
-            onToggleCurrency={() => setCurrency(c => c === 'USD' ? 'ILS' : 'USD')}
-            onRefresh={refresh}
-            loading={loading}
-            stale={stale}
-            lastUpdated={lastUpdated}
-            onSelectHolding={setSelected}
-            onDeleteHolding={handleDelete}
-            onMoveHolding={handleMove}
-          />
+          {activeTab === 'home' ? (
+            <HomeScreen
+              bankBalance={bankBalance}
+              onEditBank={() => setEditingBank(true)}
+              transactions={transactions}
+              onAddTx={() => setAddingTx(true)}
+              onDeleteTx={handleDeleteTx}
+            />
+          ) : (
+            <PortfolioScreen
+              holdings={holdings}
+              enriched={enriched}
+              prices={prices}
+              exchangeRate={exchangeRate}
+              currency={currency}
+              onToggleCurrency={() => setCurrency(c => c === 'USD' ? 'ILS' : 'USD')}
+              onRefresh={refresh}
+              loading={loading}
+              stale={stale}
+              lastUpdated={lastUpdated}
+              onSelectHolding={setSelected}
+              onDeleteHolding={handleDelete}
+              onMoveHolding={handleMove}
+            />
+          )}
         </div>
 
         {/* Tab bar */}
-        <TabBar onAdd={() => setAdding(true)} />
+        <TabBar
+          active={activeTab}
+          onChange={setActiveTab}
+          onAdd={() => activeTab === 'home' ? setAddingTx(true) : setAdding(true)}
+        />
 
         {/* Detail overlay */}
         {selected && (
@@ -947,6 +1204,21 @@ export default function App() {
           <AddHoldingSheet
             onClose={() => setAdding(false)}
             onAdd={handleAdd}
+          />
+        )}
+
+        {addingTx && (
+          <AddTransactionSheet
+            onClose={() => setAddingTx(false)}
+            onSave={handleSaveTx}
+          />
+        )}
+
+        {editingBank && (
+          <BankEditSheet
+            initial={bankBalance}
+            onClose={() => setEditingBank(false)}
+            onSave={handleSaveBank}
           />
         )}
       </div>
