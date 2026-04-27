@@ -267,6 +267,7 @@ npm run test -- src/test/file.js  # Run specific file
 | "Could not fetch prices" | Check RapidAPI key is valid and has quota remaining |
 | "Cannot read property of undefined" | Ensure Supabase tables are created with correct schema |
 | Tests fail | Run `npm install` and ensure `src/test/setup.js` exists |
+| Deployment fails | Verify all three GitHub Secrets are set correctly |
 
 ## 📚 API Reference
 
