@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "bash": [
+      {
+        "prompt": "run npm commands (install, build, test, preview, lint)",
+        "allow": true,
+        "patterns": ["^npm (install|ci|run (dev|build|preview|test|lint)|test)"]
+      },
+      {
+        "prompt": "run git commands (status, add, commit, push, pull, branch, checkout, log, diff, remote)",
+        "allow": true,
+        "patterns": [
+          "^git (status|add|commit|push|pull|branch|checkout|log|diff|remote|config)",
+          "^git -C .* (status|add|commit|push|pull|branch|checkout|log|diff|remote|config)"
+        ]
+      },
+      {
+        "prompt": "check directory structure and file listings",
+        "allow": true,
+        "patterns": ["^ls ", "^find ", "^tree "]
+      },
+      {
+        "prompt": "read and view files (cat, head, tail, etc.)",
+        "allow": true,
+        "patterns": ["^cat ", "^head ", "^tail "]
+      }
+    ]
+  },
+  "env": {
+    "VITE_RAPIDAPI_KEY": {
+      "description": "Yahoo Finance RapidAPI key for stock price fetches. Get from https://rapidapi.com/apidojo/api/yahoo-finance-api3",
+      "prompt": true
+    }
+  },
+  "hooks": {
+    "preCommit": {
+      "description": "Run ESLint before commit to catch style issues",
+      "command": "npm run lint",
+      "continueOnError": true,
+      "shell": "bash"
+    }
+  }
+}

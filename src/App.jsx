@@ -53,6 +53,31 @@ function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
   })
 }
 
+function buildPortfolioReturnCurve(enriched, exchangeRate, numPts = 90) {
+  const now = Date.now()
+  const withDates = enriched
+    .filter(h => h._holding.purchaseDate && h._metrics)
+    .sort((a, b) => new Date(a._holding.purchaseDate) - new Date(b._holding.purchaseDate))
+
+  if (!withDates.length) return sparklinePoints(42, numPts)
+
+  const oldestDate = new Date(withDates[0]._holding.purchaseDate).getTime()
+  const span = now - oldestDate || 1
+
+  return Array.from({ length: numPts }, (_, i) => {
+    const pointTime = oldestDate + (i / (numPts - 1)) * span
+    let total = 0
+    for (const h of withDates) {
+      const t0 = new Date(h._holding.purchaseDate).getTime()
+      if (t0 > pointTime) continue
+      const progress = Math.min((pointTime - t0) / (now - t0 || 1), 1)
+      const factor = h.market === 'IL' ? 1 / exchangeRate : 1
+      total += (h._metrics.adjustedCostBasis + progress * (h._metrics.currentValue - h._metrics.adjustedCostBasis)) * factor
+    }
+    return total
+  })
+}
+
 // ─── logo ─────────────────────────────────────────────────────────────────────
 const LOGO_COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6']
 
@@ -63,6 +88,25 @@ const CRYPTO_COLORS = {
   ADA:  '#3468dc',
   DOGE: '#c2a633',
   XRP:  '#00a4d3',
+}
+
+const SECTOR_MAP = {
+  AAPL:'Tech', MSFT:'Tech', GOOGL:'Tech', GOOG:'Tech', META:'Tech', NVDA:'Tech',
+  TSLA:'Tech', AMZN:'Tech', NFLX:'Tech', AMD:'Tech', CRM:'Tech', ORCL:'Tech',
+  ADBE:'Tech', INTC:'Tech', QCOM:'Tech', UBER:'Tech', LYFT:'Tech', SNAP:'Tech',
+  JPM:'Finance', BAC:'Finance', GS:'Finance', V:'Finance', MA:'Finance',
+  WFC:'Finance', MS:'Finance', AXP:'Finance', BLK:'Finance', C:'Finance',
+  XOM:'Energy', CVX:'Energy', COP:'Energy', SLB:'Energy', BP:'Energy',
+  JNJ:'Healthcare', PFE:'Healthcare', UNH:'Healthcare', MRNA:'Healthcare',
+  ABBV:'Healthcare', LLY:'Healthcare', BMY:'Healthcare', MRK:'Healthcare',
+  WMT:'Consumer', HD:'Consumer', MCD:'Consumer', KO:'Consumer', PEP:'Consumer',
+  COST:'Consumer', NKE:'Consumer', SBUX:'Consumer', TGT:'Consumer',
+  SPY:'Index', QQQ:'Index', VTI:'Index', VOO:'Index', IWM:'Index', GLD:'Index',
+}
+
+const SECTOR_COLORS = {
+  Tech:'#6366f1', Finance:'#22c55e', Energy:'#f59e0b', Healthcare:'#ec4899',
+  Consumer:'#06b6d4', Index:'#8b5cf6', Crypto:'#f97316', IL:'#3b82f6', Other:'rgba(255,255,255,0.25)',
 }
 
 function generateLogo(ticker) {
@@ -99,7 +143,10 @@ function Sparkline({ data, color = '#22c55e', width = 52, height = 24 }) {
   )
 }
 
-function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
+function PriceChart({ data, color = '#22c55e', width = 360, height = 120, formatValue }) {
+  const [tooltip, setTooltip] = useState(null)
+  useEffect(() => setTooltip(null), [data])
+
   if (!data?.length) return <div style={{ width, height }} />
   const min = Math.min(...data), max = Math.max(...data)
   const range = max - min || 1
@@ -116,8 +163,27 @@ function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
   }
   const area = `${d} L${width} ${height} L0 ${height} Z`
   const id = `pc${color.replace(/[^a-z0-9]/gi, '')}`
+
+  const fmt = formatValue ?? (v => `$${v < 1 ? v.toFixed(4) : v.toFixed(2)}`)
+
+  const handleMove = (e) => {
+    e.preventDefault()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const relX = Math.max(0, Math.min(clientX - rect.left, width))
+    const idx = Math.max(0, Math.min(data.length - 1, Math.round((relX / width) * (data.length - 1))))
+    setTooltip({ x: pts[idx][0], y: pts[idx][1], value: data[idx] })
+  }
+
+  const tipW = 82
+  const tipH = 26
+  const tipX = tooltip ? Math.max(4, Math.min(tooltip.x - tipW / 2, width - tipW - 4)) : 0
+  const tipY = tooltip ? (tooltip.y < 44 ? tooltip.y + 10 : tooltip.y - tipH - 8) : 0
+
   return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
+    <svg width={width} height={height} style={{ display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+      onMouseMove={handleMove} onMouseLeave={() => setTooltip(null)}
+      onTouchMove={handleMove} onTouchEnd={() => setTooltip(null)}>
       <defs>
         <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />
@@ -126,6 +192,20 @@ function PriceChart({ data, color = '#22c55e', width = 360, height = 120 }) {
       </defs>
       <path d={area} fill={`url(#${id})`} />
       <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {tooltip && (
+        <>
+          <line x1={tooltip.x.toFixed(1)} y1={0} x2={tooltip.x.toFixed(1)} y2={height}
+            stroke="rgba(255,255,255,0.18)" strokeWidth="1" strokeDasharray="4,3" />
+          <circle cx={tooltip.x.toFixed(1)} cy={tooltip.y.toFixed(1)} r={4.5}
+            fill={color} stroke="#000" strokeWidth="2" />
+          <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={8}
+            fill="rgba(10,10,15,0.88)" stroke={`${color}55`} strokeWidth="1" />
+          <text x={tipX + tipW / 2} y={tipY + 17} fill="white" fontSize={11} fontWeight="700"
+            textAnchor="middle" fontFamily="-apple-system,BlinkMacSystemFont,sans-serif">
+            {fmt(tooltip.value)}
+          </text>
+        </>
+      )}
     </svg>
   )
 }
@@ -194,7 +274,7 @@ function HoldingRow({ h, onClick }) {
 }
 
 // ─── HoldingDetail ────────────────────────────────────────────────────────────
-function HoldingDetail({ h, onBack }) {
+function HoldingDetail({ h, onBack, onDelete, apiKey }) {
   const [range, setRange] = useState('1M')
   const isIL = h.market === 'IL'
   const currency = isIL ? 'ILS' : 'USD'
@@ -206,17 +286,25 @@ function HoldingDetail({ h, onBack }) {
     : (metrics?.effectiveCurrentPrice ?? 0) * 0.85
   const endPrice = metrics?.effectiveCurrentPrice ?? 0
 
-  const chartData = useMemo(
+  const syntheticData = useMemo(
     () => priceHistoryPoints(h.ticker, startPrice, endPrice, 90),
     [h.ticker, startPrice, endPrice]
   )
+  const [chartData, setChartData] = useState(syntheticData)
+
+  useEffect(() => {
+    if (!apiKey) return
+    fetchHistory(h.ticker, range, apiKey)
+      .then(data => { if (data.length >= 2) setChartData(data) })
+      .catch(() => {})
+  }, [h.ticker, range, apiKey])
 
   const isUp = (metrics?.totalReturn ?? 0) >= 0
   const accent = isUp ? '#22c55e' : '#ef4444'
   const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}>
+    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}>
       {/* Sticky nav */}
       <div className="sticky top-0 z-10 px-4 pb-3 flex items-center gap-3"
         style={{
@@ -252,7 +340,8 @@ function HoldingDetail({ h, onBack }) {
 
         {/* Chart */}
         <div className="mt-4 -mx-5">
-          <PriceChart data={chartData} color={accent} width={390} height={160} />
+          <PriceChart data={chartData} color={accent} width={390} height={160}
+            formatValue={v => formatCurrency(isIL ? v / 100 : v, currency)} />
         </div>
 
         {/* Range tabs */}
@@ -277,7 +366,7 @@ function HoldingDetail({ h, onBack }) {
           <div className="grid grid-cols-2 gap-3">
             <DetailStat label="Quantity" value={h.qty < 1 ? h.qty.toFixed(4) : h.qty.toLocaleString()} />
             <DetailStat label="Avg cost"
-              value={metrics ? formatCurrency(
+              value={metrics ? formatCurrencyPrecise(
                 isIL ? h._holding.purchasePrice / 100 : h._holding.purchasePrice, currency
               ) : '—'} />
             <DetailStat label="Total gain"
@@ -289,9 +378,21 @@ function HoldingDetail({ h, onBack }) {
             <DetailStat label="Cost basis"
               value={metrics ? formatCurrency(metrics.adjustedCostBasis, currency) : '—'} />
             <DetailStat label="Break-even"
-              value={metrics ? formatCurrency(metrics.breakEven, currency) : '—'} />
+              value={metrics ? formatCurrencyPrecise(metrics.breakEven, currency) : '—'} />
           </div>
         </div>
+
+        {/* Delete */}
+        <button
+          onClick={() => {
+            if (confirm(`Remove ${displaySymbol(h.ticker)} from your portfolio?`)) {
+              onDelete(h.ticker)
+              onBack()
+            }
+          }}
+          className="w-full h-[48px] mt-5 rounded-2xl font-bold text-[14px] tracking-tight border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/15 transition-colors">
+          Remove holding
+        </button>
 
         {/* Transactions */}
         {h._holding.purchaseDate || h._holding.purchasePrice ? (
@@ -299,21 +400,21 @@ function HoldingDetail({ h, onBack }) {
             <div className="text-[11px] font-semibold tracking-widest uppercase text-white/45 mb-2">Transactions</div>
             <div className="rounded-[18px] overflow-hidden bg-white/3 border border-white/5">
               <div className="flex items-center gap-3 px-4 py-3.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 text-[10px] font-bold">BUY</div>
-                <div className="flex-1">
-                  <div className="text-[13px] font-semibold">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 text-[10px] font-bold shrink-0">BUY</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold truncate">
                     {h.qty < 1 ? h.qty.toFixed(4) : h.qty} @ {metrics ? formatCurrency(
                       isIL ? (h._holding.purchasePrice / 100) : h._holding.purchasePrice, currency
                     ) : '—'}
                   </div>
                   {h._holding.purchaseDate && (
                     <div className="text-[11px] text-white/45 mt-0.5">
-                      {new Date(h._holding.purchaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(h._holding.purchaseDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}
                     </div>
                   )}
                 </div>
                 {metrics && (
-                  <div className="text-[13px] font-semibold tabular-nums">
+                  <div className="text-[13px] font-semibold tabular-nums shrink-0">
                     {formatCurrency(metrics.adjustedCostBasis, currency)}
                   </div>
                 )}
@@ -323,15 +424,6 @@ function HoldingDetail({ h, onBack }) {
         ) : null}
       </div>
 
-      {/* Action bar */}
-      <div className="sticky bottom-0 px-5 pt-4 pb-8 flex gap-2.5"
-        style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0),#000 30%)' }}>
-        <button className="flex-1 h-12 rounded-2xl font-bold text-[14px] tracking-tight bg-white/8 text-white">Sell</button>
-        <button className="flex-1 h-12 rounded-2xl font-bold text-[14px] tracking-tight text-black"
-          style={{ background: accent, boxShadow: `0 8px 24px ${accent}44` }}>
-          Buy more
-        </button>
-      </div>
     </div>
   )
 }
@@ -354,16 +446,26 @@ function AddHoldingSheet({ onClose, onAdd }) {
   const [purchaseDate, setPurchaseDate] = useState('')
   const [error, setError] = useState('')
 
-  const isTASE = symbol.toUpperCase().endsWith('.TA')
+  const sym = symbol.trim().toUpperCase()
+  const isTASE = isILStock(sym)
+  const isCryptoSym = isCrypto(sym)
+  const marketType = isTASE ? 'IL' : isCryptoSym ? 'CRYPTO' : 'US'
+  const marketLabel = isTASE ? 'Israeli stock (TASE)' : isCryptoSym ? 'Cryptocurrency' : 'US stock'
+  const marketColor = isTASE ? '#6366f1' : isCryptoSym ? '#f59e0b' : 'rgba(255,255,255,0.35)'
+  const priceCurrency = isTASE ? 'ILS' : 'USD'
+  const priceLabel = isTASE ? 'Price (agorot)' : isCryptoSym ? 'Price (USD)' : 'Price (USD)'
+  const feesLabel = isTASE ? 'Fees (₪)' : 'Fees ($)'
 
   function handleSubmit() {
-    const sym = symbol.trim().toUpperCase()
-    if (!sym) return setError('Ticker is required')
+    const cleanSym = sym
+    if (!cleanSym) return setError('Ticker is required')
     const qty = parseFloat(shares)
     if (!qty || qty <= 0) return setError('Enter a valid quantity')
+    const fmtRegex = /^[A-Z0-9]+(\.[A-Z]{2,4}|-USD)?$/
+    if (!fmtRegex.test(cleanSym)) return setError('Invalid ticker format (e.g. AAPL, TEVA.TA, BTC-USD)')
     setError('')
     onAdd({
-      symbol: sym,
+      symbol: cleanSym,
       shares: qty,
       purchasePrice: parseFloat(purchasePrice) || 0,
       fees: parseFloat(fees) || 0,
@@ -393,23 +495,32 @@ function AddHoldingSheet({ onClose, onAdd }) {
 
         <div className="space-y-3">
           <SheetField label="Ticker symbol">
-            <input className="sheet-input" placeholder="e.g. AAPL, ELBT.TA, BTC-USD"
-              value={symbol} onChange={e => setSymbol(e.target.value)} />
+            <input className="sheet-input" placeholder="e.g. AAPL, TEVA.TA, BTC-USD"
+              value={symbol} onChange={e => setSymbol(e.target.value)} autoCapitalize="characters" />
+            {sym && (
+              <p className="text-[10px] mt-1 font-semibold" style={{ color: marketColor }}>
+                {marketLabel}
+              </p>
+            )}
           </SheetField>
 
           <div className="grid grid-cols-2 gap-3">
             <SheetField label="Quantity">
-              <input className="sheet-input" type="number" placeholder="0.00"
+              <input className="sheet-input" type="number" placeholder="0.00" inputMode="decimal"
                 value={shares} onChange={e => setShares(e.target.value)} />
             </SheetField>
-            <SheetField label={isTASE ? 'Price (agorot)' : 'Price (USD)'}>
-              <input className="sheet-input" type="number" placeholder="0.00"
+            <SheetField label={priceLabel}>
+              <input className="sheet-input" type="number" placeholder="0.00" inputMode="decimal"
                 value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} />
               {isTASE && <p className="text-[10px] text-white/30 mt-1">100 agorot = ₪1</p>}
             </SheetField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            <SheetField label={feesLabel}>
+              <input className="sheet-input" type="number" placeholder="0.00" inputMode="decimal"
+                value={fees} onChange={e => setFees(e.target.value)} />
+            </SheetField>
             <SheetField label="Date">
               <div className="relative">
                 <input className="sheet-input sheet-input-date" type="date"
@@ -420,10 +531,6 @@ function AddHoldingSheet({ onClose, onAdd }) {
                   </span>
                 )}
               </div>
-            </SheetField>
-            <SheetField label="Fees">
-              <input className="sheet-input" type="number" placeholder="0.00"
-                value={fees} onChange={e => setFees(e.target.value)} />
             </SheetField>
           </div>
         </div>
@@ -462,11 +569,11 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
     </svg>
   )
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-2.5"
+    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-1"
       style={{
         background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)',
         backdropFilter: 'blur(12px)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
       }}>
       <TabBtn icon={tabIcon('home', activeTab === 'home')} label="Home"
         active={activeTab === 'home'} onClick={() => onTabChange('home')} />
@@ -474,7 +581,7 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
         active={activeTab === 'markets'} onClick={() => onTabChange('markets')} />
       <div className="flex-1 flex justify-center">
         <button onClick={onAdd}
-          className="w-[52px] h-[52px] rounded-full flex items-center justify-center -translate-y-3 font-bold"
+          className="w-[48px] h-[48px] rounded-full flex items-center justify-center -translate-y-1 font-bold"
           style={{ background: '#22c55e', boxShadow: '0 6px 20px rgba(34,197,94,0.4)' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
@@ -512,10 +619,12 @@ const formatUpdatedAt = (date) => {
   return `Updated ${month} ${day}, ${year} · ${hh}:${mm}`
 }
 
-function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding }) {
+function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding, onDeleteHolding, onMoveHolding }) {
+  const [editMode, setEditMode] = useState(false)
   const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
   const [range, setRange] = useState('1M')
+  const [allocTab, setAllocTab] = useState('geo')
   const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
 
   const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
@@ -523,7 +632,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   const gainColor = isGainUp ? '#22c55e' : '#ef4444'
   const isAllTimeUp = allTimePct >= 0
 
-  const chartData = useMemo(() => sparklinePoints(42, 90), [])
+  const chartData = useMemo(() => buildPortfolioReturnCurve(enriched, exchangeRate), [enriched, exchangeRate])
   const chartColor = isGainUp ? '#22c55e' : '#ef4444'
 
   const sorted = [...enriched].sort((a, b) => {
@@ -532,11 +641,33 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
     return vb - va
   })
 
-  const allocationSlices = [
+  const geoSlices = [
     { label: 'Crypto', value: cryptoPct, color: '#f59e0b' },
     { label: 'US',     value: usPct,     color: '#22c55e' },
     { label: 'IL',     value: ilPct,     color: '#6366f1' },
   ].filter(s => s.value > 0)
+
+  const assetSlices = [
+    { label: 'Equities', value: usPct + ilPct, color: '#22c55e' },
+    { label: 'Crypto',   value: cryptoPct,     color: '#f59e0b' },
+  ].filter(s => s.value > 0)
+
+  const sectorValues = useMemo(() => {
+    const totals = {}
+    for (const h of enriched) {
+      if (!h._metrics) continue
+      const baseSymbol = displaySymbol(h.ticker).replace('.TA', '')
+      const sector = h.market === 'CRYPTO' ? 'Crypto' : h.market === 'IL' ? 'IL' : (SECTOR_MAP[baseSymbol] ?? 'Other')
+      const val = h.market === 'IL' ? h._metrics.currentValue / exchangeRate : h._metrics.currentValue
+      totals[sector] = (totals[sector] ?? 0) + val
+    }
+    const grand = Object.values(totals).reduce((a, b) => a + b, 0) || 1
+    return Object.entries(totals)
+      .map(([label, val]) => ({ label, value: (val / grand) * 100, color: SECTOR_COLORS[label] ?? SECTOR_COLORS.Other }))
+      .sort((a, b) => b.value - a.value)
+  }, [enriched, exchangeRate])
+
+  const allocationSlices = allocTab === 'asset' ? assetSlices : allocTab === 'sector' ? sectorValues : geoSlices
 
   const updatedText = formatUpdatedAt(lastUpdated)
 
@@ -613,7 +744,8 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
           </div>
           {/* Chart */}
           <div className="-mx-5">
-            <PriceChart data={chartData} color={chartColor} width={350} height={90} />
+            <PriceChart data={chartData} color={chartColor} width={350} height={90}
+              formatValue={v => formatCurrency(v, 'USD')} />
           </div>
           {/* Range tabs */}
           <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
@@ -628,10 +760,20 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       </div>
 
       {/* Allocation */}
-      {holdings.length > 0 && allocationSlices.length > 0 && (
+      {holdings.length > 0 && geoSlices.length > 0 && (
         <div className="mx-5 mt-3">
           <div className="glass-card-small p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-3">Allocation</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[12px] font-bold uppercase tracking-widest text-white/70">Allocation</div>
+              <div className="flex gap-0.5 p-0.5 rounded-lg bg-black/30">
+                {[['geo','Geo'],['asset','Asset'],['sector','Sector']].map(([key,label]) => (
+                  <button key={key} onClick={() => setAllocTab(key)}
+                    className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-colors ${allocTab === key ? 'bg-white/12 text-white' : 'text-white/35'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <AllocationBar slices={allocationSlices} />
             <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-3">
               {allocationSlices.map(s => (
@@ -647,17 +789,47 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       )}
 
       {/* Holdings list */}
-      {sorted.length > 0 && (
+      {enriched.length > 0 && (
         <div className="mx-5 mt-4">
           <div className="flex items-baseline justify-between px-1 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
-              Holdings · {sorted.length}
+            <span className="text-[12px] font-bold uppercase tracking-widest text-white/70">
+              Holdings · {enriched.length}
             </span>
-            <span className="text-[11px] text-white/40">Value ↓</span>
+            <button onClick={() => setEditMode(m => !m)}
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors ${editMode ? 'bg-emerald-500/20 text-emerald-400' : 'text-white/50 hover:text-white/80'}`}>
+              {editMode ? 'Done' : 'Edit'}
+            </button>
           </div>
           <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
-            {sorted.map(h => (
-              <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+            {(editMode ? enriched : sorted).map((h, i, arr) => (
+              editMode ? (
+                <div key={h.ticker} className="flex items-center gap-2 px-3 py-2">
+                  <div className="flex flex-col gap-0.5">
+                    <button disabled={i === 0} onClick={() => onMoveHolding(h.ticker, 'up')}
+                      className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
+                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 7l3-3 3 3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
+                    </button>
+                    <button disabled={i === arr.length - 1} onClick={() => onMoveHolding(h.ticker, 'down')}
+                      className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
+                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3l3 3 3-3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
+                    </button>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <Logo ticker={h.ticker} size={32} />
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
+                      <div className="text-[11px] text-white/40 truncate">{h.name}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    if (confirm(`Remove ${displaySymbol(h.ticker)}?`)) onDeleteHolding(h.ticker)
+                  }} className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-center">
+                    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              ) : (
+                <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+              )
             ))}
           </div>
         </div>
@@ -1597,12 +1769,13 @@ export default function App() {
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-[#050505] text-white" style={{
-      minHeight: '100dvh',
+      height: '100dvh',
+      overflow: 'hidden',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       WebkitFontSmoothing: 'antialiased',
       backgroundImage: 'radial-gradient(at 85% 15%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(at 10% 85%, rgba(37,99,235,0.06), transparent 60%)',
     }}>
-      <div className="max-w-[430px] mx-auto relative" style={{ minHeight: '100dvh' }}>
+      <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
         <div className="absolute inset-0">
           {activeTab === 'home' && (
             <PortfolioScreen
