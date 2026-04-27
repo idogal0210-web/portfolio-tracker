@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   isCrypto, getMarket, displaySymbol,
   formatCurrency, calculateTotals, calculateAllTimeReturn,
@@ -12,7 +12,14 @@ import {
   loadRecurring, saveRecurring,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
 } from './utils'
-import { fetchPrices } from './api'
+import {
+  fetchPrices, supabaseConfigured,
+  getSession, signInWithPassword, signUp, signOut, onAuthChange,
+  fetchHoldings, upsertHolding, deleteHoldingBySymbol, bulkUpsertHoldings,
+  fetchTransactions, upsertTransaction, deleteTransaction, bulkInsertTransactions,
+  fetchBudgets, upsertBudget, deleteBudget, bulkUpsertBudgets,
+  fetchRecurring, upsertRecurring, deleteRecurring, bulkUpsertRecurring,
+} from './api'
 
 // ─── deterministic PRNG ───────────────────────────────────────────────────────
 function makeRand(seed) {
@@ -1259,7 +1266,12 @@ function ActivityScreen({
 }
 
 // ─── YouScreen ────────────────────────────────────────────────────────────────
-function YouScreen({ currency, onToggleCurrency }) {
+function YouScreen({
+  currency, onToggleCurrency,
+  cloudAvailable, session, syncing,
+  onSignIn, onSignOut,
+}) {
+  const email = session?.user?.email
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
@@ -1281,7 +1293,131 @@ function YouScreen({ currency, onToggleCurrency }) {
             </button>
           </div>
         </div>
+
+        {cloudAvailable && (
+          <div className="glass-card-small p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45">Cloud sync</div>
+              {syncing && <div className="text-[10px] text-emerald-400">Syncing…</div>}
+            </div>
+            {session ? (
+              <>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 font-bold text-[14px]">
+                    {email?.[0]?.toUpperCase() || '·'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold truncate">{email}</div>
+                    <div className="text-[11px] text-emerald-400">Synced across devices</div>
+                  </div>
+                </div>
+                <button onClick={onSignOut}
+                  className="w-full h-10 rounded-xl border border-white/8 bg-white/4 text-white/80 font-semibold text-[12px]">
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-[12px] text-white/55 leading-relaxed mb-3">
+                  Optional: sign in to sync holdings, transactions, and budgets across all your devices.
+                </div>
+                <button onClick={onSignIn}
+                  className="w-full h-10 rounded-xl text-black font-bold text-[12px]"
+                  style={{ background: '#22c55e' }}>
+                  Sign in / Create account
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+// ─── AuthSheet ───────────────────────────────────────────────────────────────
+function AuthSheet({ onClose, onSignedIn }) {
+  const [mode, setMode] = useState('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(''); setInfo('')
+    if (!email || !password) return setError('Email and password are required')
+    setBusy(true)
+    try {
+      if (mode === 'signup') {
+        const session = await signUp(email, password)
+        if (session) { onSignedIn(session); onClose() }
+        else setInfo('Check your inbox to confirm your email, then sign in.')
+      } else {
+        const session = await signInWithPassword(email, password)
+        onSignedIn(session)
+        onClose()
+      }
+    } catch (err) {
+      setError(err?.message || 'Something went wrong')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <form onSubmit={handleSubmit} className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+        style={{
+          background: '#0E0E10',
+          boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)',
+        }}>
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[20px] font-bold tracking-tight">
+            {mode === 'signup' ? 'Create account' : 'Sign in'}
+          </span>
+          <button type="button" onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
+        </div>
+        <div className="text-[12px] text-white/50 leading-relaxed mb-4">
+          Your local data will be merged with the cloud on first sign-in.
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Email</div>
+            <input className="sheet-input" type="email" autoComplete="email"
+              value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Password</div>
+            <input className="sheet-input" type="password"
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+        </div>
+
+        {error && <p className="text-rose-400 text-xs mt-3">{error}</p>}
+        {info && <p className="text-emerald-400 text-xs mt-3">{info}</p>}
+
+        <button type="submit" disabled={busy}
+          className="w-full h-[48px] mt-5 rounded-2xl font-bold text-[14px] tracking-tight text-black disabled:opacity-50"
+          style={{ background: '#22c55e' }}>
+          {busy ? '…' : mode === 'signup' ? 'Create account' : 'Sign in'}
+        </button>
+
+        <div className="mt-4 text-center text-[12px] text-white/50">
+          {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button type="button" className="text-emerald-400 font-semibold"
+            onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setInfo('') }}>
+            {mode === 'signup' ? 'Sign in' : 'Create one'}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -1326,6 +1462,13 @@ export default function App() {
   const [editingTxn, setEditingTxn] = useState(null)
   const [managingBudgets, setManagingBudgets] = useState(false)
   const [managingRecurring, setManagingRecurring] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+
+  // ── auth state (optional) ─────────────────────────────────────────────────
+  const [session, setSession] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const userId = session?.user?.id ?? null
+  const syncedForUser = useRef(null)
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
@@ -1349,6 +1492,59 @@ export default function App() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── auth bootstrap ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!supabaseConfigured) return
+    getSession().then(setSession).catch(console.error)
+    return onAuthChange(setSession)
+  }, [])
+
+  // ── initial sync after sign-in: merge local + cloud ───────────────────────
+  useEffect(() => {
+    if (!userId || syncedForUser.current === userId) return
+    syncedForUser.current = userId
+    setSyncing(true)
+    ;(async () => {
+      try {
+        const [cloudH, cloudT, cloudB, cloudR] = await Promise.all([
+          fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
+        ])
+        const localH = loadHoldings()
+        const localT = loadTransactions()
+        const localB = loadBudgets()
+        const localR = loadRecurring()
+
+        const cloudSymbols = new Set(cloudH.map(h => h.symbol))
+        const localOnlyH = localH.filter(h => !cloudSymbols.has(h.symbol))
+        const cloudTxnIds = new Set(cloudT.map(t => t.id))
+        const localOnlyT = localT.filter(t => t.id && !cloudTxnIds.has(t.id))
+        const cloudCats = new Set(cloudB.map(b => b.category))
+        const localOnlyB = localB.filter(b => !cloudCats.has(b.category))
+        const cloudRIds = new Set(cloudR.map(r => r.id))
+        const localOnlyR = localR.filter(r => r.id && !cloudRIds.has(r.id))
+
+        await Promise.all([
+          localOnlyH.length ? bulkUpsertHoldings(localOnlyH, userId) : null,
+          localOnlyT.length ? bulkInsertTransactions(localOnlyT, userId) : null,
+          localOnlyB.length ? bulkUpsertBudgets(localOnlyB, userId) : null,
+          localOnlyR.length ? bulkUpsertRecurring(localOnlyR, userId) : null,
+        ].filter(Boolean))
+
+        const [finalH, finalT, finalB, finalR] = await Promise.all([
+          fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
+        ])
+        setHoldings(finalH); saveHoldings(finalH)
+        setTransactions(finalT); saveTransactions(finalT)
+        setBudgets(finalB); saveBudgets(finalB)
+        setRecurring(finalR); saveRecurring(finalR)
+      } catch (err) {
+        console.error('Initial sync failed:', err)
+      } finally {
+        setSyncing(false)
+      }
+    })()
+  }, [userId])
+
   // ── price refresh ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
     if (!holdings.length) return
@@ -1371,12 +1567,14 @@ export default function App() {
   // ── holdings handlers ──────────────────────────────────────────────────────
   const handleAdd = useCallback((holding) => {
     if (holdings.find(h => h.symbol === holding.symbol)) return
+    const withId = { ...holding, id: newId() }
     setHoldings(prev => {
-      const next = [...prev, { ...holding, id: newId() }]
+      const next = [...prev, withId]
       saveHoldings(next)
       return next
     })
-  }, [holdings])
+    if (userId) upsertHolding(withId, userId).catch(console.error)
+  }, [holdings, userId])
 
   const handleDelete = useCallback((symbol) => {
     setHoldings(prev => {
@@ -1385,7 +1583,8 @@ export default function App() {
       return next
     })
     setPrices(prev => { const next = { ...prev }; delete next[symbol]; return next })
-  }, [])
+    if (userId) deleteHoldingBySymbol(symbol, userId).catch(console.error)
+  }, [userId])
 
   // ── transaction handlers ───────────────────────────────────────────────────
   const handleSaveTxn = useCallback((txn) => {
@@ -1396,7 +1595,8 @@ export default function App() {
       saveTransactions(next)
       return next
     })
-  }, [])
+    if (userId) upsertTransaction(withId, userId).catch(console.error)
+  }, [userId])
 
   const handleDeleteTxn = useCallback((id) => {
     setTransactions(prev => {
@@ -1404,18 +1604,21 @@ export default function App() {
       saveTransactions(next)
       return next
     })
-  }, [])
+    if (userId) deleteTransaction(id).catch(console.error)
+  }, [userId])
 
   // ── budget handlers ────────────────────────────────────────────────────────
   const handleSaveBudget = useCallback((budget) => {
+    const withId = budget.id ? budget : { id: newId(), ...budget }
     setBudgets(prev => {
-      const next = prev.find(b => b.category === budget.category)
-        ? prev.map(b => b.category === budget.category ? { ...b, ...budget } : b)
-        : [...prev, { id: newId(), ...budget }]
+      const next = prev.find(b => b.category === withId.category)
+        ? prev.map(b => b.category === withId.category ? { ...b, ...withId } : b)
+        : [...prev, withId]
       saveBudgets(next)
       return next
     })
-  }, [])
+    if (userId) upsertBudget(withId, userId).catch(console.error)
+  }, [userId])
 
   const handleDeleteBudget = useCallback((category) => {
     setBudgets(prev => {
@@ -1423,7 +1626,8 @@ export default function App() {
       saveBudgets(next)
       return next
     })
-  }, [])
+    if (userId) deleteBudget(category, userId).catch(console.error)
+  }, [userId])
 
   // ── recurring handlers ─────────────────────────────────────────────────────
   const handleSaveRecurring = useCallback((template) => {
@@ -1434,7 +1638,8 @@ export default function App() {
       saveRecurring(next)
       return next
     })
-  }, [])
+    if (userId) upsertRecurring(withId, userId).catch(console.error)
+  }, [userId])
 
   const handleDeleteRecurring = useCallback((id) => {
     setRecurring(prev => {
@@ -1442,11 +1647,19 @@ export default function App() {
       saveRecurring(next)
       return next
     })
-  }, [])
+    if (userId) deleteRecurring(id).catch(console.error)
+  }, [userId])
 
   // ── currency toggle ────────────────────────────────────────────────────────
   const toggleCurrency = useCallback(() => {
     setCurrency(c => c === 'USD' ? 'ILS' : 'USD')
+  }, [])
+
+  // ── sign out (keeps local data) ───────────────────────────────────────────
+  const handleSignOut = useCallback(async () => {
+    try { await signOut() } catch (e) { console.error(e) }
+    syncedForUser.current = null
+    setSession(null)
   }, [])
 
   // ── CSV export ─────────────────────────────────────────────────────────────
@@ -1516,7 +1729,13 @@ export default function App() {
           )}
           {activeTab === 'markets' && <MarketsScreen />}
           {activeTab === 'you' && (
-            <YouScreen currency={currency} onToggleCurrency={toggleCurrency} />
+            <YouScreen
+              currency={currency} onToggleCurrency={toggleCurrency}
+              cloudAvailable={supabaseConfigured}
+              session={session} syncing={syncing}
+              onSignIn={() => setShowAuth(true)}
+              onSignOut={handleSignOut}
+            />
           )}
         </div>
 
@@ -1553,6 +1772,13 @@ export default function App() {
             onClose={() => setManagingRecurring(false)}
             onSave={handleSaveRecurring}
             onDelete={handleDeleteRecurring}
+          />
+        )}
+
+        {showAuth && (
+          <AuthSheet
+            onClose={() => setShowAuth(false)}
+            onSignedIn={setSession}
           />
         )}
       </div>
