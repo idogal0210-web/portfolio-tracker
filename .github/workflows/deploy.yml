@@ -28,6 +28,8 @@ jobs:
         run: npm run build
         env:
           VITE_RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
