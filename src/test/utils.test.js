@@ -20,9 +20,12 @@ import {
   budgetProgress,
   materializeRecurring,
   toCSV,
-  cacheLoad,
-  cacheSave,
-  cacheClearAll,
+  loadTransactions,
+  saveTransactions,
+  loadBudgets,
+  saveBudgets,
+  loadRecurring,
+  saveRecurring,
   newId,
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
@@ -567,42 +570,35 @@ describe('toCSV', () => {
   })
 })
 
-describe('Namespaced cache helpers', () => {
+describe('localStorage helpers', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it('cacheLoad returns fallback when nothing stored', () => {
-    expect(cacheLoad('u1', 'transactions', [])).toEqual([])
+  it('loadTransactions returns [] when nothing stored', () => {
+    expect(loadTransactions()).toEqual([])
   })
 
-  it('cacheSave + cacheLoad round-trips data', () => {
-    cacheSave('u1', 'transactions', [{ id: 'a', amount: 5 }])
-    expect(cacheLoad('u1', 'transactions', [])).toEqual([{ id: 'a', amount: 5 }])
+  it('saveTransactions + loadTransactions round-trips data', () => {
+    saveTransactions([{ id: 'a', amount: 5 }])
+    expect(loadTransactions()).toEqual([{ id: 'a', amount: 5 }])
   })
 
-  it('isolates data per user', () => {
-    cacheSave('u1', 'transactions', [{ id: 'a' }])
-    cacheSave('u2', 'transactions', [{ id: 'b' }])
-    expect(cacheLoad('u1', 'transactions', [])).toEqual([{ id: 'a' }])
-    expect(cacheLoad('u2', 'transactions', [])).toEqual([{ id: 'b' }])
+  it('loadBudgets returns [] when nothing stored', () => {
+    expect(loadBudgets()).toEqual([])
   })
 
-  it('returns fallback when userId is missing', () => {
-    cacheSave(null, 'transactions', [{ id: 'a' }])
-    expect(cacheLoad(null, 'transactions', [])).toEqual([])
+  it('saveBudgets + loadBudgets round-trips data', () => {
+    saveBudgets([{ category: 'Food', amount: 500 }])
+    expect(loadBudgets()).toEqual([{ category: 'Food', amount: 500 }])
   })
 
-  it('cacheClearAll wipes all kinds for a user', () => {
-    cacheSave('u1', 'transactions', [{ id: 'a' }])
-    cacheSave('u1', 'budgets', [{ category: 'Food' }])
-    cacheClearAll('u1')
-    expect(cacheLoad('u1', 'transactions', null)).toBeNull()
-    expect(cacheLoad('u1', 'budgets', null)).toBeNull()
+  it('loadRecurring returns [] when nothing stored', () => {
+    expect(loadRecurring()).toEqual([])
   })
 
-  it('cacheLoad survives corrupt JSON', () => {
-    localStorage.setItem('mystock_u_u1_transactions', 'not-json')
-    expect(cacheLoad('u1', 'transactions', [])).toEqual([])
+  it('saveRecurring + loadRecurring round-trips data', () => {
+    saveRecurring([{ id: 'r1', cadence: 'MONTHLY' }])
+    expect(loadRecurring()).toEqual([{ id: 'r1', cadence: 'MONTHLY' }])
   })
 })

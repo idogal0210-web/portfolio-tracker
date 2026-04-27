@@ -2,23 +2,17 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   isCrypto, getMarket, displaySymbol,
   formatCurrency, calculateTotals, calculateAllTimeReturn,
-  loadHoldings, clearLegacyHoldings, loadPricesCache, savePricesCache,
+  loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
   calculateHoldingMetrics,
   convertAmount, calculateMonthlyTotals, aggregateByCategory,
   groupTransactionsByDate, calculateMonthlyTrend, budgetProgress,
   materializeRecurring, toCSV, newId,
-  cacheLoad, cacheSave, cacheClearAll,
+  loadTransactions, saveTransactions,
+  loadBudgets, saveBudgets,
+  loadRecurring, saveRecurring,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
 } from './utils'
-import {
-  fetchPrices,
-  getSession, signOut, onAuthChange,
-  fetchHoldings, upsertHolding, deleteHoldingBySymbol,
-  fetchTransactions, upsertTransaction, bulkInsertTransactions, deleteTransaction,
-  fetchBudgets, upsertBudget, deleteBudget,
-  fetchRecurring, upsertRecurring, updateRecurringMaterialized, deleteRecurring,
-  fetchProfile, updateProfileCurrency,
-} from './api'
+import { fetchPrices } from './api'
 
 // ─── deterministic PRNG ───────────────────────────────────────────────────────
 function makeRand(seed) {
@@ -1265,7 +1259,7 @@ function ActivityScreen({
 }
 
 // ─── YouScreen ────────────────────────────────────────────────────────────────
-function YouScreen({ currency, onToggleCurrency, onSignOut }) {
+function YouScreen({ currency, onToggleCurrency }) {
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
@@ -1287,10 +1281,6 @@ function YouScreen({ currency, onToggleCurrency, onSignOut }) {
             </button>
           </div>
         </div>
-        <button onClick={onSignOut}
-          className="w-full p-4 rounded-[20px] border border-rose-500/30 bg-rose-500/10 text-rose-300 font-semibold text-[14px] text-left">
-          Sign out
-        </button>
       </div>
     </div>
   )
@@ -1314,27 +1304,18 @@ function MarketsScreen() {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  // ── auth ──────────────────────────────────────────────────────────────────
-  const [session, setSession] = useState(null)
-  const userId = session?.user?.id ?? null
-
-  useEffect(() => {
-    getSession().then(setSession)
-    return onAuthChange(setSession)
-  }, [])
-
   // ── portfolio state ────────────────────────────────────────────────────────
-  const [holdings, setHoldings] = useState([])
-  const [prices, setPrices] = useState({})
+  const [holdings, setHoldings] = useState(() => loadHoldings())
+  const [prices, setPrices] = useState(() => loadPricesCache() ?? {})
   const [exchangeRate, setExchangeRate] = useState(3.7)
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
 
   // ── cash flow state ────────────────────────────────────────────────────────
-  const [transactions, setTransactions] = useState([])
-  const [budgets, setBudgets] = useState([])
-  const [recurring, setRecurring] = useState([])
+  const [transactions, setTransactions] = useState(() => loadTransactions())
+  const [budgets, setBudgets] = useState(() => loadBudgets())
+  const [recurring, setRecurring] = useState(() => loadRecurring())
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [currency, setCurrency] = useState('USD')
@@ -1348,83 +1329,25 @@ export default function App() {
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
-  // ── data hydration ─────────────────────────────────────────────────────────
+  // ── materialize recurring on mount ────────────────────────────────────────
   useEffect(() => {
-    if (!userId) return
-
-    // Paint from cache immediately
-    const cachedHoldings = cacheLoad(userId, 'holdings', [])
-    const cachedTxns = cacheLoad(userId, 'transactions', [])
-    const cachedBudgets = cacheLoad(userId, 'budgets', [])
-    const cachedRecurring = cacheLoad(userId, 'recurring', [])
-    const cachedPrices = cacheLoad(userId, 'prices', {})
-    const cachedProfile = cacheLoad(userId, 'profile', null)
-    if (cachedHoldings.length) setHoldings(cachedHoldings)
-    if (cachedTxns.length) setTransactions(cachedTxns)
-    if (cachedBudgets.length) setBudgets(cachedBudgets)
-    if (cachedRecurring.length) setRecurring(cachedRecurring)
-    if (cachedPrices && Object.keys(cachedPrices).length) setPrices(cachedPrices)
-    if (cachedProfile?.currency) setCurrency(cachedProfile.currency)
-
-    // Fetch from Supabase
-    Promise.all([
-      fetchHoldings(),
-      fetchTransactions(),
-      fetchBudgets(),
-      fetchRecurring(),
-      fetchProfile(),
-    ]).then(([dbHoldings, dbTxns, dbBudgets, dbRecurring, dbProfile]) => {
-      // First-login migration: import legacy localStorage holdings
-      if (dbHoldings.length === 0) {
-        const legacy = loadHoldings()
-        if (legacy.length > 0) {
-          Promise.all(legacy.map(h => upsertHolding(h, userId)))
-            .then(imported => {
-              setHoldings(imported)
-              cacheSave(userId, 'holdings', imported)
-              clearLegacyHoldings()
-            })
-            .catch(console.error)
-        }
-      } else {
-        setHoldings(dbHoldings)
-        cacheSave(userId, 'holdings', dbHoldings)
-      }
-
-      setTransactions(dbTxns)
-      cacheSave(userId, 'transactions', dbTxns)
-
-      setBudgets(dbBudgets)
-      cacheSave(userId, 'budgets', dbBudgets)
-
-      setRecurring(dbRecurring)
-      cacheSave(userId, 'recurring', dbRecurring)
-
-      if (dbProfile?.currency) setCurrency(dbProfile.currency)
-      cacheSave(userId, 'profile', dbProfile)
-
-      // Materialize recurring templates
-      const todayIso = new Date().toISOString().slice(0, 10)
-      const { newTxns, updatedTemplates } = materializeRecurring(dbRecurring, todayIso)
-      if (newTxns.length > 0) {
-        bulkInsertTransactions(newTxns, userId).then(inserted => {
-          setTransactions(prev => {
-            const next = [...prev, ...inserted]
-            cacheSave(userId, 'transactions', next)
-            return next
-          })
-        }).catch(console.error)
-      }
-      if (updatedTemplates.length > 0) {
-        updatedTemplates.forEach(t => updateRecurringMaterialized(t.id, t.last_materialized_date))
-        setRecurring(prev => {
-          const next = prev.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
-          cacheSave(userId, 'recurring', next)
-          return next
-        })
-      }
-    }).catch(console.error)
-  }, [userId])
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const { newTxns, updatedTemplates } = materializeRecurring(recurring, todayIso)
+    if (newTxns.length > 0) {
+      setTransactions(prev => {
+        const next = [...prev, ...newTxns]
+        saveTransactions(next)
+        return next
+      })
+    }
+    if (updatedTemplates.length > 0) {
+      setRecurring(prev => {
+        const next = prev.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
+        saveRecurring(next)
+        return next
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── price refresh ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
@@ -1434,7 +1357,6 @@ export default function App() {
       const { priceMap, exchangeRate: rate } = await fetchPrices(holdings.map(h => h.symbol), apiKey)
       setPrices(priceMap)
       setExchangeRate(rate)
-      if (userId) cacheSave(userId, 'prices', priceMap)
       savePricesCache(priceMap)
       setLastUpdated(Date.now())
     } catch {
@@ -1442,122 +1364,90 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [holdings, apiKey, userId])
+  }, [holdings, apiKey])
 
   useEffect(() => { refresh() }, [refresh])
 
   // ── holdings handlers ──────────────────────────────────────────────────────
-  const handleAdd = useCallback(async (holding) => {
+  const handleAdd = useCallback((holding) => {
     if (holdings.find(h => h.symbol === holding.symbol)) return
-    const saved = userId
-      ? await upsertHolding(holding, userId).catch(() => ({ ...holding, id: newId() }))
-      : { ...holding, id: newId() }
     setHoldings(prev => {
-      const next = [...prev, saved]
-      if (userId) cacheSave(userId, 'holdings', next)
+      const next = [...prev, { ...holding, id: newId() }]
+      saveHoldings(next)
       return next
     })
-  }, [holdings, userId])
+  }, [holdings])
 
-  const handleDelete = useCallback(async (symbol) => {
-    if (userId) deleteHoldingBySymbol(symbol, userId).catch(console.error)
+  const handleDelete = useCallback((symbol) => {
     setHoldings(prev => {
       const next = prev.filter(h => h.symbol !== symbol)
-      if (userId) cacheSave(userId, 'holdings', next)
+      saveHoldings(next)
       return next
     })
     setPrices(prev => { const next = { ...prev }; delete next[symbol]; return next })
-  }, [userId])
+  }, [])
 
   // ── transaction handlers ───────────────────────────────────────────────────
-  const handleSaveTxn = useCallback(async (txn) => {
+  const handleSaveTxn = useCallback((txn) => {
     const isNew = !txn.id
     const withId = isNew ? { ...txn, id: newId(), createdAt: Date.now() } : txn
-    // optimistic
     setTransactions(prev => {
       const next = isNew ? [...prev, withId] : prev.map(t => t.id === withId.id ? withId : t)
-      if (userId) cacheSave(userId, 'transactions', next)
+      saveTransactions(next)
       return next
     })
-    if (userId) {
-      upsertTransaction(withId, userId).then(saved => {
-        setTransactions(prev => {
-          const next = prev.map(t => t.id === withId.id ? saved : t)
-          cacheSave(userId, 'transactions', next)
-          return next
-        })
-      }).catch(console.error)
-    }
-  }, [userId])
+  }, [])
 
-  const handleDeleteTxn = useCallback(async (id) => {
+  const handleDeleteTxn = useCallback((id) => {
     setTransactions(prev => {
       const next = prev.filter(t => t.id !== id)
-      if (userId) cacheSave(userId, 'transactions', next)
+      saveTransactions(next)
       return next
     })
-    if (userId) deleteTransaction(id).catch(console.error)
-  }, [userId])
+  }, [])
 
   // ── budget handlers ────────────────────────────────────────────────────────
-  const handleSaveBudget = useCallback(async (budget) => {
+  const handleSaveBudget = useCallback((budget) => {
     setBudgets(prev => {
       const next = prev.find(b => b.category === budget.category)
         ? prev.map(b => b.category === budget.category ? { ...b, ...budget } : b)
         : [...prev, { id: newId(), ...budget }]
-      if (userId) cacheSave(userId, 'budgets', next)
+      saveBudgets(next)
       return next
     })
-    if (userId) upsertBudget(budget, userId).catch(console.error)
-  }, [userId])
+  }, [])
 
-  const handleDeleteBudget = useCallback(async (category) => {
+  const handleDeleteBudget = useCallback((category) => {
     setBudgets(prev => {
       const next = prev.filter(b => b.category !== category)
-      if (userId) cacheSave(userId, 'budgets', next)
+      saveBudgets(next)
       return next
     })
-    if (userId) deleteBudget(category, userId).catch(console.error)
-  }, [userId])
+  }, [])
 
   // ── recurring handlers ─────────────────────────────────────────────────────
-  const handleSaveRecurring = useCallback(async (template) => {
+  const handleSaveRecurring = useCallback((template) => {
     const isNew = !template.id
-    const withId = isNew ? { ...template, id: newId(), user_id: userId } : template
+    const withId = isNew ? { ...template, id: newId() } : template
     setRecurring(prev => {
       const next = isNew ? [...prev, withId] : prev.map(t => t.id === withId.id ? withId : t)
-      if (userId) cacheSave(userId, 'recurring', next)
+      saveRecurring(next)
       return next
     })
-    if (userId) upsertRecurring(withId, userId).catch(console.error)
-  }, [userId])
+  }, [])
 
-  const handleDeleteRecurring = useCallback(async (id) => {
+  const handleDeleteRecurring = useCallback((id) => {
     setRecurring(prev => {
       const next = prev.filter(t => t.id !== id)
-      if (userId) cacheSave(userId, 'recurring', next)
+      saveRecurring(next)
       return next
     })
-    if (userId) deleteRecurring(id).catch(console.error)
-  }, [userId])
+  }, [])
 
   // ── currency toggle ────────────────────────────────────────────────────────
   const toggleCurrency = useCallback(() => {
-    setCurrency(c => {
-      const next = c === 'USD' ? 'ILS' : 'USD'
-      if (userId) updateProfileCurrency(next, userId).catch(console.error)
-      return next
-    })
-  }, [userId])
-
-  // ── sign out ───────────────────────────────────────────────────────────────
-  const handleSignOut = useCallback(async () => {
-    if (userId) cacheClearAll(userId)
-    await signOut()
-    setSession(null)
-    setHoldings([]); setTransactions([]); setBudgets([]); setRecurring([])
-    setPrices({}); setActiveTab('home')
-  }, [userId])
+    setCurrency(c => c === 'USD' ? 'ILS' : 'USD')
+  }, [])
 
   // ── CSV export ─────────────────────────────────────────────────────────────
   const handleExportCsv = useCallback(() => {
@@ -1626,7 +1516,7 @@ export default function App() {
           )}
           {activeTab === 'markets' && <MarketsScreen />}
           {activeTab === 'you' && (
-            <YouScreen currency={currency} onToggleCurrency={toggleCurrency} onSignOut={handleSignOut} />
+            <YouScreen currency={currency} onToggleCurrency={toggleCurrency} />
           )}
         </div>
 
