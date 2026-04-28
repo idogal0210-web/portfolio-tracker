@@ -305,7 +305,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
   const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}>
+    <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}>
       {/* Sticky nav */}
       <div className="sticky top-0 z-10 px-4 pb-3 flex items-center gap-3"
         style={{
@@ -477,9 +477,9 @@ function AddHoldingSheet({ onClose, onAdd }) {
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+    <div className="fixed inset-0 z-30 flex flex-col items-center justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5"
+      <div className="relative w-full max-w-[430px] text-white rounded-t-[28px] p-5"
         style={{
           background: '#0E0E10',
           boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
@@ -570,7 +570,7 @@ function TabBar({ activeTab, onTabChange, onAdd, fabDisabled = false }) {
     </svg>
   )
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-1"
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-10 flex items-center px-5 pt-1"
       style={{
         background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)',
         backdropFilter: 'blur(12px)',
@@ -673,8 +673,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   const updatedText = formatUpdatedAt(lastUpdated)
 
   return (
-    <div className="overflow-y-auto no-scrollbar" style={{
-      height: '100%',
+    <div style={{
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'env(safe-area-inset-top)',
     }}>
@@ -958,9 +957,9 @@ function AddTransactionSheet({ initial, defaultCurrency, onClose, onSave, onDele
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+    <div className="fixed inset-0 z-30 flex flex-col items-center justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+      <div className="relative w-full max-w-[430px] text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
         style={{
           background: '#0E0E10',
           boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
@@ -1071,9 +1070,9 @@ function BudgetSheet({ budgets, defaultCurrency, onClose, onSave, onDelete }) {
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+    <div className="fixed inset-0 z-30 flex flex-col items-center justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 max-h-[88dvh] overflow-y-auto"
+      <div className="relative w-full max-w-[430px] text-white rounded-t-[28px] p-5 max-h-[88dvh] overflow-y-auto"
         style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
         <div className="flex items-center justify-between mb-4">
@@ -1128,9 +1127,9 @@ function RecurringSheet({ templates, defaultCurrency, onClose, onSave, onDelete 
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+    <div className="fixed inset-0 z-30 flex flex-col items-center justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+      <div className="relative w-full max-w-[430px] text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
         style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
         <div className="flex items-center justify-between mb-4">
@@ -1271,8 +1270,7 @@ function ActivityScreen({
   const catColors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6','#ec4899','#84cc16']
 
   return (
-    <div className="overflow-y-auto no-scrollbar" style={{
-      height: '100%',
+    <div style={{
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'env(safe-area-inset-top)',
     }}>
@@ -1445,8 +1443,7 @@ function YouScreen({
 }) {
   const email = session?.user?.email
   return (
-    <div className="overflow-y-auto no-scrollbar" style={{
-      height: '100%',
+    <div style={{
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'env(safe-area-inset-top)',
     }}>
@@ -1540,9 +1537,9 @@ function AuthSheet({ onClose, onSignedIn }) {
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end">
+    <div className="fixed inset-0 z-30 flex flex-col items-center justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <form onSubmit={handleSubmit} className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+      <form onSubmit={handleSubmit} className="relative w-full max-w-[430px] text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
         style={{
           background: '#0E0E10',
           boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
@@ -1599,7 +1596,8 @@ function AuthSheet({ onClose, onSignedIn }) {
 function MarketsScreen() {
   return (
     <div className="flex items-center justify-center" style={{
-      height: '100%',
+      minHeight: 'calc(100dvh - 128px)',
+      paddingTop: 'env(safe-area-inset-top)',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
     }}>
       <div className="text-center px-8">
@@ -1883,45 +1881,42 @@ export default function App() {
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-[#050505] text-white" style={{
-      height: '100dvh',
-      overflow: 'hidden',
+      minHeight: '100dvh',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       WebkitFontSmoothing: 'antialiased',
       backgroundImage: 'radial-gradient(at 85% 15%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(at 10% 85%, rgba(37,99,235,0.06), transparent 60%)',
     }}>
-      <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
-        <div className="absolute inset-0">
-          {activeTab === 'home' && (
-            <PortfolioScreen
-              holdings={holdings} enriched={enriched} prices={prices}
-              exchangeRate={exchangeRate} currency={currency}
-              onToggleCurrency={toggleCurrency} onRefresh={refresh}
-              loading={loading} stale={stale} lastUpdated={lastUpdated}
-              onSelectHolding={setSelected}
-            />
-          )}
-          {activeTab === 'activity' && (
-            <ActivityScreen
-              transactions={transactions} budgets={budgets}
-              currency={currency} exchangeRate={exchangeRate}
-              onToggleCurrency={toggleCurrency}
-              onOpenBudgets={() => setManagingBudgets(true)}
-              onOpenRecurring={() => setManagingRecurring(true)}
-              onEditTxn={setEditingTxn}
-              onExportCsv={handleExportCsv}
-            />
-          )}
-          {activeTab === 'markets' && <MarketsScreen />}
-          {activeTab === 'you' && (
-            <YouScreen
-              currency={currency} onToggleCurrency={toggleCurrency}
-              cloudAvailable={supabaseConfigured}
-              session={session} syncing={syncing}
-              onSignIn={() => setShowAuth(true)}
-              onSignOut={handleSignOut}
-            />
-          )}
-        </div>
+      <div className="max-w-[430px] mx-auto relative" style={{ minHeight: '100dvh' }}>
+        {activeTab === 'home' && (
+          <PortfolioScreen
+            holdings={holdings} enriched={enriched} prices={prices}
+            exchangeRate={exchangeRate} currency={currency}
+            onToggleCurrency={toggleCurrency} onRefresh={refresh}
+            loading={loading} stale={stale} lastUpdated={lastUpdated}
+            onSelectHolding={setSelected}
+          />
+        )}
+        {activeTab === 'activity' && (
+          <ActivityScreen
+            transactions={transactions} budgets={budgets}
+            currency={currency} exchangeRate={exchangeRate}
+            onToggleCurrency={toggleCurrency}
+            onOpenBudgets={() => setManagingBudgets(true)}
+            onOpenRecurring={() => setManagingRecurring(true)}
+            onEditTxn={setEditingTxn}
+            onExportCsv={handleExportCsv}
+          />
+        )}
+        {activeTab === 'markets' && <MarketsScreen />}
+        {activeTab === 'you' && (
+          <YouScreen
+            currency={currency} onToggleCurrency={toggleCurrency}
+            cloudAvailable={supabaseConfigured}
+            session={session} syncing={syncing}
+            onSignIn={() => setShowAuth(true)}
+            onSignOut={handleSignOut}
+          />
+        )}
 
         <TabBar activeTab={activeTab} onTabChange={setActiveTab} onAdd={handleFab} fabDisabled={syncing} />
 
