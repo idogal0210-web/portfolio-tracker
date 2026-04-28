@@ -574,7 +574,7 @@ function TabBar({ activeTab, onTabChange, onAdd, fabDisabled = false }) {
       style={{
         background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)',
         backdropFilter: 'blur(12px)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 2px)',
       }}>
       <TabBtn icon={tabIcon('home', activeTab === 'home')} label="Home"
         active={activeTab === 'home'} onClick={() => onTabChange('home')} />
