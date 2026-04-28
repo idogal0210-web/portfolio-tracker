@@ -2,7 +2,7 @@
 
 @theme {
   --color-slate-950: #050505;
-  --font-family-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 @layer base {
@@ -32,29 +32,32 @@
     scrollbar-width: none;
   }
 
+  /* IQ.FINANCE panel — replaces old glass-card */
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.025), transparent);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 2rem;
+  }
+
+  /* IQ.FINANCE small panel — replaces old glass-card-small */
+  .glass-card-small {
+    background: linear-gradient(135deg, rgba(255,255,255,0.02), transparent);
+    border: 1px solid rgba(255,255,255,0.035);
+    border-radius: 1.5rem;
+  }
+
+  /* New: ultra-subtle glass panel for insight rows */
+  .glass-panel {
+    background: rgba(255,255,255,0.01);
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  /* Existing utilities — keep unchanged */
   .glass-effect {
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .glass-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 35px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  }
-
-  .glass-card-small {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
 
   .glass-form {
@@ -78,6 +81,5 @@
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
