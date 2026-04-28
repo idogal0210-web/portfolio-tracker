@@ -206,7 +206,7 @@ export async function upsertTransaction(txn, userId) {
   return fromDbTransaction(data)
 }
 
-export async function bulkInsertTransactions(txns, userId) {
+export async function bulkUpsertTransactions(txns, userId) {
   if (!txns?.length) return []
   const payload = txns.map(t => toDbTransaction(t, userId))
   const { data, error } = await requireClient()

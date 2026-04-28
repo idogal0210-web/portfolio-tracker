@@ -425,6 +425,20 @@ export const saveBankBalance = (v) => {
   try { localStorage.setItem(BANK_BALANCE_KEY, String(v)) } catch {}
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Cloud-sync classification (pure)
+// ────────────────────────────────────────────────────────────────────────────
+
+// Returns items in `local` whose key (per keyFn) is non-null and absent from `cloud`.
+// Used during initial sign-in sync to decide which local rows still need to be pushed.
+export const findLocalOnly = (cloud, local, keyFn) => {
+  const cloudKeys = new Set((cloud || []).map(keyFn))
+  return (local || []).filter(item => {
+    const key = keyFn(item)
+    return key != null && !cloudKeys.has(key)
+  })
+}
+
 export const summarizeMonth = (transactions, ref = new Date()) => {
   const y = ref.getFullYear(), m = ref.getMonth()
   let income = 0, expense = 0

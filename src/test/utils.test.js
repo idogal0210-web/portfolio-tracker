@@ -12,6 +12,7 @@ import {
   loadPricesCache,
   savePricesCache,
   calculateHoldingMetrics,
+  findLocalOnly,
 } from '../utils'
 
 describe('isILStock', () => {
@@ -254,5 +255,28 @@ describe('calculateAllTimeReturn', () => {
     const result = calculateAllTimeReturn([], {}, exchangeRate)
     expect(result.pct).toBe(0)
     expect(result.totalReturnUSD).toBe(0)
+  })
+})
+
+describe('findLocalOnly (cloud-sync classifier)', () => {
+  it('returns all local items when cloud is empty', () => {
+    const local = [{ id: 'a' }, { id: 'b' }]
+    expect(findLocalOnly([], local, x => x.id)).toEqual(local)
+  })
+
+  it('returns [] when local is empty', () => {
+    expect(findLocalOnly([{ id: 'a' }], [], x => x.id)).toEqual([])
+  })
+
+  it('returns only items absent from cloud (overlap by id)', () => {
+    const cloud = [{ id: 'a' }, { id: 'b' }]
+    const local = [{ id: 'a' }, { id: 'c' }]
+    expect(findLocalOnly(cloud, local, x => x.id)).toEqual([{ id: 'c' }])
+  })
+
+  it('skips items whose key is null/undefined', () => {
+    const cloud = [{ symbol: 'AAPL' }]
+    const local = [{ symbol: 'AAPL' }, { symbol: 'TSLA' }, { symbol: undefined }]
+    expect(findLocalOnly(cloud, local, x => x.symbol)).toEqual([{ symbol: 'TSLA' }])
   })
 })

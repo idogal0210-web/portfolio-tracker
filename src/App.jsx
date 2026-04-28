@@ -6,7 +6,7 @@ import {
   calculateHoldingMetrics,
   convertAmount, calculateMonthlyTotals, aggregateByCategory,
   groupTransactionsByDate, calculateMonthlyTrend, budgetProgress,
-  materializeRecurring, toCSV, newId,
+  materializeRecurring, toCSV, newId, findLocalOnly,
   loadTransactions, saveTransactions,
   loadBudgets, saveBudgets,
   loadRecurring, saveRecurring,
@@ -16,7 +16,7 @@ import {
   fetchPrices, supabaseConfigured,
   getSession, signInWithPassword, signUp, signOut, onAuthChange,
   fetchHoldings, upsertHolding, deleteHoldingBySymbol, bulkUpsertHoldings,
-  fetchTransactions, upsertTransaction, deleteTransaction, bulkInsertTransactions,
+  fetchTransactions, upsertTransaction, deleteTransaction, bulkUpsertTransactions,
   fetchBudgets, upsertBudget, deleteBudget, bulkUpsertBudgets,
   fetchRecurring, upsertRecurring, deleteRecurring, bulkUpsertRecurring,
 } from './api'
@@ -563,7 +563,7 @@ const TAB_PATHS = {
   you:      'M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6',
 }
 
-function TabBar({ activeTab, onTabChange, onAdd }) {
+function TabBar({ activeTab, onTabChange, onAdd, fabDisabled = false }) {
   const tabIcon = (key, active) => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
       <path d={TAB_PATHS[key]} stroke={active ? '#22c55e' : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -581,8 +581,8 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
       <TabBtn icon={tabIcon('markets', activeTab === 'markets')} label="Markets"
         active={activeTab === 'markets'} onClick={() => onTabChange('markets')} />
       <div className="flex-1 flex justify-center">
-        <button onClick={onAdd}
-          className="w-[48px] h-[48px] rounded-full flex items-center justify-center -translate-y-1 font-bold"
+        <button onClick={onAdd} disabled={fabDisabled}
+          className="w-[48px] h-[48px] rounded-full flex items-center justify-center -translate-y-1 font-bold disabled:opacity-40"
           style={{ background: '#22c55e', boxShadow: '0 6px 20px rgba(34,197,94,0.4)' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
@@ -1519,15 +1519,16 @@ function AuthSheet({ onClose, onSignedIn }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError(''); setInfo('')
-    if (!email || !password) return setError('Email and password are required')
+    const cleanEmail = email.trim()
+    if (!cleanEmail || !password) return setError('Email and password are required')
     setBusy(true)
     try {
       if (mode === 'signup') {
-        const session = await signUp(email, password)
+        const session = await signUp(cleanEmail, password)
         if (session) { onSignedIn(session); onClose() }
         else setInfo('Check your inbox to confirm your email, then sign in.')
       } else {
-        const session = await signInWithPassword(email, password)
+        const session = await signInWithPassword(cleanEmail, password)
         onSignedIn(session)
         onClose()
       }
@@ -1681,30 +1682,39 @@ export default function App() {
         const [cloudH, cloudT, cloudB, cloudR] = await Promise.all([
           fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
         ])
-        const localH = loadHoldings()
-        const localT = loadTransactions()
-        const localB = loadBudgets()
-        const localR = loadRecurring()
 
-        const cloudSymbols = new Set(cloudH.map(h => h.symbol))
-        const localOnlyH = localH.filter(h => !cloudSymbols.has(h.symbol))
-        const cloudTxnIds = new Set(cloudT.map(t => t.id))
-        const localOnlyT = localT.filter(t => t.id && !cloudTxnIds.has(t.id))
-        const cloudCats = new Set(cloudB.map(b => b.category))
-        const localOnlyB = localB.filter(b => !cloudCats.has(b.category))
-        const cloudRIds = new Set(cloudR.map(r => r.id))
-        const localOnlyR = localR.filter(r => r.id && !cloudRIds.has(r.id))
+        const localOnlyH = findLocalOnly(cloudH, loadHoldings(),    h => h.symbol)
+        const localOnlyT = findLocalOnly(cloudT, loadTransactions(), t => t.id)
+        const localOnlyB = findLocalOnly(cloudB, loadBudgets(),     b => b.category)
+        const localOnlyR = findLocalOnly(cloudR, loadRecurring(),   r => r.id)
 
-        await Promise.all([
-          localOnlyH.length ? bulkUpsertHoldings(localOnlyH, userId) : null,
-          localOnlyT.length ? bulkInsertTransactions(localOnlyT, userId) : null,
-          localOnlyB.length ? bulkUpsertBudgets(localOnlyB, userId) : null,
-          localOnlyR.length ? bulkUpsertRecurring(localOnlyR, userId) : null,
-        ].filter(Boolean))
+        const hasLocalOnly = localOnlyH.length || localOnlyT.length || localOnlyB.length || localOnlyR.length
 
-        const [finalH, finalT, finalB, finalR] = await Promise.all([
-          fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
-        ])
+        let finalH = cloudH, finalT = cloudT, finalB = cloudB, finalR = cloudR
+        if (hasLocalOnly) {
+          await Promise.all([
+            localOnlyH.length ? bulkUpsertHoldings(localOnlyH, userId) : null,
+            localOnlyT.length ? bulkUpsertTransactions(localOnlyT, userId) : null,
+            localOnlyB.length ? bulkUpsertBudgets(localOnlyB, userId) : null,
+            localOnlyR.length ? bulkUpsertRecurring(localOnlyR, userId) : null,
+          ].filter(Boolean))
+          ;[finalH, finalT, finalB, finalR] = await Promise.all([
+            fetchHoldings(), fetchTransactions(), fetchBudgets(), fetchRecurring(),
+          ])
+        }
+
+        // Materialize any recurring templates that arrived from the cloud and are due.
+        const todayIso = new Date().toISOString().slice(0, 10)
+        const { newTxns, updatedTemplates } = materializeRecurring(finalR, todayIso)
+        if (newTxns.length) {
+          finalT = [...finalT, ...newTxns]
+          bulkUpsertTransactions(newTxns, userId).catch(console.error)
+        }
+        if (updatedTemplates.length) {
+          finalR = finalR.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
+          bulkUpsertRecurring(updatedTemplates, userId).catch(console.error)
+        }
+
         setHoldings(finalH); saveHoldings(finalH)
         setTransactions(finalT); saveTransactions(finalT)
         setBudgets(finalB); saveBudgets(finalB)
@@ -1846,9 +1856,10 @@ export default function App() {
 
   // ── FAB context ────────────────────────────────────────────────────────────
   const handleFab = useCallback(() => {
+    if (syncing) return
     if (activeTab === 'activity') setAddingTxn(true)
     else setAdding(true)
-  }, [activeTab])
+  }, [activeTab, syncing])
 
   // ── enriched holdings ──────────────────────────────────────────────────────
   const enriched = useMemo(() => holdings.map(holding => {
@@ -1912,7 +1923,7 @@ export default function App() {
           )}
         </div>
 
-        <TabBar activeTab={activeTab} onTabChange={setActiveTab} onAdd={handleFab} />
+        <TabBar activeTab={activeTab} onTabChange={setActiveTab} onAdd={handleFab} fabDisabled={syncing} />
 
         {selected && <HoldingDetail h={selected} onBack={() => setSelected(null)} />}
 
