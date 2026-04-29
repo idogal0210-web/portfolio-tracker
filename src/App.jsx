@@ -156,6 +156,7 @@ function Sparkline({ data, color = '#22c55e', width = 52, height = 24 }) {
 
 function PriceChart({ data, color = '#22c55e', width = 360, height = 120, formatValue }) {
   const [tooltip, setTooltip] = useState(null)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setTooltip(null), [data])
 
   if (!data?.length) return <div style={{ width, height }} />
@@ -472,10 +473,8 @@ function AddHoldingSheet({ onClose, onAdd }) {
   const sym = symbol.trim().toUpperCase()
   const isTASE = isILStock(sym)
   const isCryptoSym = isCrypto(sym)
-  const marketType = isTASE ? 'IL' : isCryptoSym ? 'CRYPTO' : 'US'
   const marketLabel = isTASE ? 'Israeli stock (TASE)' : isCryptoSym ? 'Cryptocurrency' : 'US stock'
   const marketColor = isTASE ? '#6366f1' : isCryptoSym ? '#f59e0b' : 'rgba(255,255,255,0.35)'
-  const priceCurrency = isTASE ? 'ILS' : 'USD'
   const priceLabel = isTASE ? 'Price (agorot)' : isCryptoSym ? 'Price (USD)' : 'Price (USD)'
   const feesLabel = isTASE ? 'Fees (₪)' : 'Fees ($)'
 
@@ -1162,7 +1161,7 @@ function BudgetSheet({ budgets, defaultCurrency, onClose, onSave, onDelete }) {
   const [drafts, setDrafts] = useState(() =>
     Object.fromEntries(budgets.map(b => [b.category, { amount: String(b.amount), currency: b.currency }]))
   )
-  const [currency, setCurrency] = useState(defaultCurrency || 'USD')
+  const currency = defaultCurrency || 'USD'
 
   function patch(cat, key, val) {
     setDrafts(prev => ({ ...prev, [cat]: { ...(prev[cat] || { amount: '', currency }), [key]: val } }))
@@ -1809,7 +1808,7 @@ function AuthSheet({ onClose, onSignedIn }) {
 }
 
 // ─── MarketsScreen ────────────────────────────────────────────────────────────
-function MarketsScreen({ enriched, currency, onSelectHolding }) {
+function MarketsScreen({ enriched, onSelectHolding }) {
   const [filter, setFilter] = useState('ALL')
   const filters = ['ALL', 'US', 'IL', 'CRYPTO']
 
@@ -1965,10 +1964,31 @@ export default function App() {
   const [exchangeRate, setExchangeRate] = useState(3.7)
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
-  // ── cash flow state ────────────────────────────────────────────────────────
-  const [transactions, setTransactions] = useState(() => loadTransactions())
+  // ── cash flow state (materialize recurring on init) ──────────────────────
+  const [transactions, setTransactions] = useState(() => {
+    const txns = loadTransactions()
+    const templates = loadRecurring()
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const { newTxns } = materializeRecurring(templates, todayIso)
+    if (newTxns.length > 0) {
+      const next = [...txns, ...newTxns]
+      saveTransactions(next)
+      return next
+    }
+    return txns
+  })
   const [budgets, setBudgets] = useState(() => loadBudgets())
-  const [recurring, setRecurring] = useState(() => loadRecurring())
+  const [recurring, setRecurring] = useState(() => {
+    const templates = loadRecurring()
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const { updatedTemplates } = materializeRecurring(templates, todayIso)
+    if (updatedTemplates.length > 0) {
+      const next = templates.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
+      saveRecurring(next)
+      return next
+    }
+    return templates
+  })
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [currency, setCurrency] = useState('USD')
@@ -1988,26 +2008,6 @@ export default function App() {
   const syncedForUser = useRef(null)
 
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
-
-  // ── materialize recurring on mount ────────────────────────────────────────
-  useEffect(() => {
-    const todayIso = new Date().toISOString().slice(0, 10)
-    const { newTxns, updatedTemplates } = materializeRecurring(recurring, todayIso)
-    if (newTxns.length > 0) {
-      setTransactions(prev => {
-        const next = [...prev, ...newTxns]
-        saveTransactions(next)
-        return next
-      })
-    }
-    if (updatedTemplates.length > 0) {
-      setRecurring(prev => {
-        const next = prev.map(t => updatedTemplates.find(u => u.id === t.id) ?? t)
-        saveRecurring(next)
-        return next
-      })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── auth bootstrap ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2078,7 +2078,7 @@ export default function App() {
     }
   }, [holdings, apiKey])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { refresh() }, [refresh]) // eslint-disable-line react-hooks/set-state-in-effect
 
   // ── holdings handlers ──────────────────────────────────────────────────────
   const handleAdd = useCallback((holding) => {
@@ -2278,7 +2278,6 @@ export default function App() {
           {activeTab === 'markets' && (
             <MarketsScreen
               enriched={enriched}
-              currency={currency}
               onSelectHolding={setSelected}
             />
           )}

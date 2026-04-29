@@ -365,7 +365,7 @@ export const loadHoldings = () => {
 }
 
 export const saveHoldings = (holdings) => {
-  try { localStorage.setItem(HOLDINGS_KEY, JSON.stringify(holdings)) } catch {}
+  try { localStorage.setItem(HOLDINGS_KEY, JSON.stringify(holdings)) } catch (_) { /* storage unavailable */ }
 }
 
 export const clearLegacyHoldings = () => {
@@ -382,7 +382,7 @@ export const loadPricesCache = () => {
 }
 
 export const savePricesCache = (prices) => {
-  try { localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices)) } catch {}
+  try { localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices)) } catch (_) { /* storage unavailable */ }
 }
 
 const EXCHANGE_RATE_KEY = 'mystock_exchange_rate'
@@ -392,7 +392,7 @@ export const loadExchangeRate = () => {
 }
 
 export const saveExchangeRate = (rate) => {
-  try { localStorage.setItem(EXCHANGE_RATE_KEY, String(rate)) } catch {}
+  try { localStorage.setItem(EXCHANGE_RATE_KEY, String(rate)) } catch (_) { /* storage unavailable */ }
 }
 
 const lsLoad = (key, fallback) => {
@@ -405,7 +405,7 @@ const lsLoad = (key, fallback) => {
 }
 
 const lsSave = (key, data) => {
-  try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
+  try { localStorage.setItem(key, JSON.stringify(data)) } catch (_) { /* storage unavailable */ }
 }
 
 export const loadTransactions = () => lsLoad(TRANSACTIONS_KEY, [])
@@ -422,7 +422,7 @@ export const loadBankBalance = () => {
 }
 
 export const saveBankBalance = (v) => {
-  try { localStorage.setItem(BANK_BALANCE_KEY, String(v)) } catch {}
+  try { localStorage.setItem(BANK_BALANCE_KEY, String(v)) } catch (_) { /* storage unavailable */ }
 }
 
 export const summarizeMonth = (transactions, ref = new Date()) => {
