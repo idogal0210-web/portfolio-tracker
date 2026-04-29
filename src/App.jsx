@@ -1605,8 +1605,12 @@ function YouScreen({
   currency, onToggleCurrency,
   cloudAvailable, session, syncing,
   onSignIn, onSignOut,
+  holdings, totalUSD, totalILS, allTimePct,
 }) {
   const email = session?.user?.email
+  const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
+  const isUp = allTimePct >= 0
+
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
@@ -1614,6 +1618,31 @@ function YouScreen({
       paddingTop: 'calc(env(safe-area-inset-top) + 60px)',
     }}>
       <div className="mx-5 space-y-3">
+
+        {/* Portfolio summary */}
+        {holdings.length > 0 && (
+          <div className="glass-card p-5">
+            <div className="iq-label mb-3">Portfolio summary</div>
+            <div className="grid grid-cols-3 gap-0">
+              <div>
+                <div className="text-[11px] mb-1" style={{ color: '#52525b' }}>Net worth</div>
+                <div className="text-[18px] font-semibold tabular-nums tracking-tight">{totalDisplay}</div>
+              </div>
+              <div className="border-l border-white/5 pl-3">
+                <div className="text-[11px] mb-1" style={{ color: '#52525b' }}>Holdings</div>
+                <div className="text-[18px] font-semibold tabular-nums">{holdings.length}</div>
+              </div>
+              <div className="border-l border-white/5 pl-3">
+                <div className="text-[11px] mb-1" style={{ color: '#52525b' }}>All-time</div>
+                <div className="text-[18px] font-semibold tabular-nums"
+                  style={{ color: isUp ? '#22c55e' : '#ef4444' }}>
+                  {isUp ? '+' : ''}{allTimePct.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="glass-card-small p-4">
           <div className="iq-label mb-3">Preferences</div>
           <div className="flex items-center justify-between">
@@ -1663,6 +1692,15 @@ function YouScreen({
             )}
           </div>
         )}
+
+        {/* App branding */}
+        <div className="pt-2 pb-1 text-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#D4AF37', boxShadow: '0 0 6px rgba(212,175,55,0.6)' }} />
+            <span style={{ fontWeight: 300, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>IQ.FINANCE</span>
+          </div>
+          <div className="text-[10px]" style={{ color: '#3f3f46' }}>Luxury portfolio intelligence</div>
+        </div>
       </div>
     </div>
   )
@@ -2157,6 +2195,16 @@ export default function App() {
     else setAdding(true)
   }, [activeTab])
 
+  // ── portfolio totals (shared across screens) ─────────────────────────────
+  const portfolioTotals = useMemo(
+    () => calculateTotals(holdings, prices, exchangeRate),
+    [holdings, prices, exchangeRate]
+  )
+  const allTimeReturn = useMemo(
+    () => calculateAllTimeReturn(holdings, prices, exchangeRate),
+    [holdings, prices, exchangeRate]
+  )
+
   // ── enriched holdings ──────────────────────────────────────────────────────
   const enriched = useMemo(() => holdings.map(holding => {
     const priceData = prices[holding.symbol] ?? null
@@ -2229,6 +2277,10 @@ export default function App() {
               session={session} syncing={syncing}
               onSignIn={() => setShowAuth(true)}
               onSignOut={handleSignOut}
+              holdings={holdings}
+              totalUSD={portfolioTotals.totalUSD}
+              totalILS={portfolioTotals.totalILS}
+              allTimePct={allTimeReturn.pct}
             />
           )}
         </div>
