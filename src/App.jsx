@@ -625,10 +625,10 @@ function AppHeader({ currency, onToggleCurrency, onRefresh, loading }) {
 
 // ─── TabBar ───────────────────────────────────────────────────────────────────
 const TAB_PATHS = {
-  home:     'M3 13l9-9 9 9M5 11v10h14V11',
-  markets:  'M3 17l4-4 4 4 7-7 3 3',
-  activity: 'M3 6h18M3 12h18M3 18h18',
-  you:      'M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6',
+  networth:  'M3 13l9-9 9 9M5 11v10h14V11',
+  cashflow:  'M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18',
+  holdings:  'M3 6h18M3 12h18M3 18h12',
+  settings:  'M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6',
 }
 
 function TabBar({ activeTab, onTabChange, onAdd }) {
@@ -646,10 +646,10 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
         borderTop: '1px solid rgba(255,255,255,0.03)',
         paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
       }}>
-      <TabBtn icon={tabIcon('home', activeTab === 'home')} label="Home"
-        active={activeTab === 'home'} onClick={() => onTabChange('home')} />
-      <TabBtn icon={tabIcon('markets', activeTab === 'markets')} label="Markets"
-        active={activeTab === 'markets'} onClick={() => onTabChange('markets')} />
+      <TabBtn icon={tabIcon('networth', activeTab === 'networth')} label="Net Worth"
+        active={activeTab === 'networth'} onClick={() => onTabChange('networth')} />
+      <TabBtn icon={tabIcon('cashflow', activeTab === 'cashflow')} label="Cashflow"
+        active={activeTab === 'cashflow'} onClick={() => onTabChange('cashflow')} />
       <div className="flex-1 flex justify-center">
         <button onClick={onAdd}
           className="w-[44px] h-[44px] rounded-full flex items-center justify-center -translate-y-1"
@@ -659,10 +659,10 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
           </svg>
         </button>
       </div>
-      <TabBtn icon={tabIcon('activity', activeTab === 'activity')} label="Activity"
-        active={activeTab === 'activity'} onClick={() => onTabChange('activity')} />
-      <TabBtn icon={tabIcon('you', activeTab === 'you')} label="You"
-        active={activeTab === 'you'} onClick={() => onTabChange('you')} />
+      <TabBtn icon={tabIcon('holdings', activeTab === 'holdings')} label="Holdings"
+        active={activeTab === 'holdings'} onClick={() => onTabChange('holdings')} />
+      <TabBtn icon={tabIcon('settings', activeTab === 'settings')} label="Settings"
+        active={activeTab === 'settings'} onClick={() => onTabChange('settings')} />
     </div>
   )
 }
@@ -683,14 +683,29 @@ function TabBtn({ icon, label, active, onClick }) {
   )
 }
 
-// ─── PortfolioScreen ──────────────────────────────────────────────────────────
-function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, stale, onSelectHolding, onDeleteHolding, onMoveHolding, transactions }) {
-  const [editMode, setEditMode] = useState(false)
+// ─── NetWorthScreen (was PortfolioScreen) ────────────────────────────────────
+function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, stale, transactions }) {
   const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
   const [range, setRange] = useState('1M')
   const [allocTab, setAllocTab] = useState('geo')
   const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
+
+  const now = new Date()
+  const [viewYear, setViewYear] = useState(now.getFullYear())
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1)
+  function prevMonth() {
+    if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1) }
+    else setViewMonth(m => m - 1)
+  }
+  function nextMonth() {
+    if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1) }
+    else setViewMonth(m => m + 1)
+  }
+  const periodTotals = useMemo(
+    () => calculateMonthlyTotals(transactions, viewYear, viewMonth, currency, exchangeRate),
+    [transactions, viewYear, viewMonth, currency, exchangeRate],
+  )
 
   const geminiKey = import.meta.env.VITE_GEMINI_KEY
   const [insights, setInsights] = useState('')
@@ -734,11 +749,6 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, s
   const chartData = useMemo(() => buildPortfolioReturnCurve(enriched, exchangeRate), [enriched, exchangeRate])
   const chartColor = isGainUp ? '#22c55e' : '#ef4444'
 
-  const sorted = [...enriched].sort((a, b) => {
-    const va = a._metrics?.currentValue ?? 0
-    const vb = b._metrics?.currentValue ?? 0
-    return vb - va
-  })
 
   const geoSlices = [
     { label: 'Crypto', value: cryptoPct, color: '#f59e0b' },
@@ -774,6 +784,19 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, s
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
+      {/* Period navigation */}
+      <div className="flex items-center justify-between px-5 pt-3 pb-1">
+        <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+        <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#D4AF37' }}>
+          {MONTH_NAMES[viewMonth - 1]} {viewYear}
+        </span>
+        <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      </div>
+
       {stale && (
         <div className="mx-5 mt-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
           ⚠ Could not fetch live prices — showing cached data.
@@ -862,6 +885,24 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, s
         </div>
       </div>
 
+      {/* INFLOW / OUTFLOW cards */}
+      {transactions.length > 0 && (
+        <div className="mx-5 mt-3 grid grid-cols-2 gap-3">
+          <div className="glass-card-small p-4">
+            <div className="iq-label mb-1" style={{ color: '#52525b' }}>Inflow</div>
+            <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#22c55e' }}>
+              {formatCurrency(periodTotals.income, currency)}
+            </div>
+          </div>
+          <div className="glass-card-small p-4">
+            <div className="iq-label mb-1" style={{ color: '#52525b' }}>Outflow</div>
+            <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#f43f5e' }}>
+              {formatCurrency(Math.abs(periodTotals.expenses), currency)}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Allocation */}
       {holdings.length > 0 && geoSlices.length > 0 && (
         <div className="mx-5 mt-3">
@@ -888,52 +929,6 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, s
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Holdings list */}
-      {enriched.length > 0 && (
-        <div className="mx-5 mt-4">
-          <div className="flex items-baseline justify-between px-1 mb-2">
-            <span className="iq-label">Holdings · {enriched.length}</span>
-            <button onClick={() => setEditMode(m => !m)}
-              className="text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors"
-              style={editMode ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.45)' }}>
-              {editMode ? 'Done' : 'Edit'}
-            </button>
-          </div>
-          <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
-            {(editMode ? enriched : sorted).map((h, i, arr) => (
-              editMode ? (
-                <div key={h.ticker} className="flex items-center gap-2 px-3 py-2">
-                  <div className="flex flex-col gap-0.5">
-                    <button disabled={i === 0} onClick={() => onMoveHolding(h.ticker, 'up')}
-                      className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
-                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 7l3-3 3 3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
-                    </button>
-                    <button disabled={i === arr.length - 1} onClick={() => onMoveHolding(h.ticker, 'down')}
-                      className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
-                      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3l3 3 3-3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
-                    </button>
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <Logo ticker={h.ticker} size={32} />
-                    <div className="min-w-0">
-                      <div className="text-[14px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
-                      <div className="text-[11px] truncate" style={{ color: '#71717a' }}>{h.name}</div>
-                    </div>
-                  </div>
-                  <button onClick={() => {
-                    if (confirm(`Remove ${displaySymbol(h.ticker)}?`)) onDeleteHolding(h.ticker)
-                  }} className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-center">
-                    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                  </button>
-                </div>
-              ) : (
-                <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
-              )
-            ))}
           </div>
         </div>
       )}
@@ -1443,53 +1438,62 @@ function ActivityScreen({
       <input ref={scanInputRef} type="file" accept=".csv,image/*,.pdf"
         className="hidden" onChange={handleScanFile} />
 
-      {/* Month picker */}
-      <div className="flex items-center justify-between px-5 py-3">
-        <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
-          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-        <span className="text-[15px] font-bold tracking-tight" style={{ color: '#D4AF37' }}>
-          {MONTH_NAMES[viewMonth - 1]} {viewYear}
-        </span>
-        <div className="flex items-center gap-2">
+      {/* Header */}
+      <div className="px-5 pt-3 pb-2">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-[26px] font-bold tracking-tight leading-none">CASHFLOW</div>
+            <div className="text-[13px] mt-0.5" style={{ color: '#71717a' }}>INCOME &amp; EXPENSES</div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            {geminiKey && (
+              <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
+                className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 text-[10px] font-semibold disabled:opacity-50"
+                style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+                {scanning ? (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="animate-spin">
+                    <circle cx="12" cy="12" r="10" stroke="#D4AF37" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12" />
+                  </svg>
+                ) : (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                )}
+                Scan
+              </button>
+            )}
+            <div className="relative">
+              <button onClick={() => setShowOverflow(v => !v)}
+                className="w-8 h-8 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/50 text-[16px]">
+                ⋯
+              </button>
+              {showOverflow && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowOverflow(false)} />
+                  <div className="absolute right-0 top-10 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]">
+                    {[['Manage budgets', onOpenBudgets], ['Recurring', onOpenRecurring], ['Export CSV', onExportCsv]].map(([lbl, fn]) => (
+                      <button key={lbl} onClick={() => { fn(); setShowOverflow(false) }}
+                        className="w-full px-4 py-3 text-left text-[13px] font-medium text-white/80 hover:bg-white/5 border-b border-white/5 last:border-0">
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Month picker */}
+        <div className="flex items-center justify-between mt-3">
+          <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+            <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#D4AF37' }}>
+            {MONTH_NAMES[viewMonth - 1]} {viewYear}
+          </span>
           <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
             <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          {geminiKey && (
-            <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
-              className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 text-[10px] font-semibold disabled:opacity-50"
-              style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
-              {scanning ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="animate-spin">
-                  <circle cx="12" cy="12" r="10" stroke="#D4AF37" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12" />
-                </svg>
-              ) : (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              )}
-              Scan
-            </button>
-          )}
-          <div className="relative">
-            <button onClick={() => setShowOverflow(v => !v)}
-              className="w-8 h-8 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/50 text-[16px]">
-              ⋯
-            </button>
-            {showOverflow && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowOverflow(false)} />
-                <div className="absolute right-0 top-10 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]">
-                  {[['Manage budgets', onOpenBudgets], ['Recurring', onOpenRecurring], ['Export CSV', onExportCsv]].map(([lbl, fn]) => (
-                    <button key={lbl} onClick={() => { fn(); setShowOverflow(false) }}
-                      className="w-full px-4 py-3 text-left text-[13px] font-medium text-white/80 hover:bg-white/5 border-b border-white/5 last:border-0">
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
 
@@ -1611,59 +1615,82 @@ function ActivityScreen({
   )
 }
 
-// ─── YouScreen ────────────────────────────────────────────────────────────────
-function YouScreen({
-  currency, onToggleCurrency,
+// ─── SettingsScreen (was YouScreen) ──────────────────────────────────────────
+function SettingsScreen({
+  currency, onToggleCurrency, onExportCsv,
   cloudAvailable, session, syncing,
   onSignIn, onSignOut,
-  holdings, totalUSD, totalILS, allTimePct,
 }) {
   const email = session?.user?.email
-  const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
-  const isUp = allTimePct >= 0
+  const displayName = email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'You'
+  const initial = displayName[0]?.toUpperCase() || 'U'
+  const [notificationsOn, setNotificationsOn] = useState(() => localStorage.getItem('iq_notifications') !== 'false')
+
+  function toggleNotifications() {
+    const next = !notificationsOn
+    setNotificationsOn(next)
+    localStorage.setItem('iq_notifications', String(next))
+  }
 
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
-      paddingTop: 'calc(env(safe-area-inset-top) + 60px)',
+      paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
-      <div className="mx-5 space-y-3">
+      <div className="mx-5 space-y-3 pt-3">
 
-        {/* Portfolio summary */}
-        {holdings.length > 0 && (
-          <div className="glass-card p-5">
-            <div className="iq-label mb-3">Portfolio summary</div>
-            <div className="grid grid-cols-3 gap-0">
-              <div>
-                <div className="text-[11px] mb-1" style={{ color: '#52525b' }}>Net worth</div>
-                <div className="text-[18px] font-semibold tabular-nums tracking-tight">{totalDisplay}</div>
-              </div>
-              <div className="border-l border-white/5 pl-3">
-                <div className="text-[11px] mb-1" style={{ color: '#52525b' }}>Holdings</div>
-                <div className="text-[18px] font-semibold tabular-nums">{holdings.length}</div>
-              </div>
-              <div className="border-l border-white/5 pl-3">
-                <div className="text-[11px] mb-1" style={{ color: '#52525b' }}>All-time</div>
-                <div className="text-[18px] font-semibold tabular-nums"
-                  style={{ color: isUp ? '#22c55e' : '#ef4444' }}>
-                  {isUp ? '+' : ''}{allTimePct.toFixed(1)}%
-                </div>
+        {/* Profile card */}
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-[24px] font-bold shrink-0"
+              style={{ background: 'rgba(212,175,55,0.12)', border: '1.5px solid rgba(212,175,55,0.4)', color: '#D4AF37' }}>
+              {initial}
+            </div>
+            <div>
+              <div className="text-[20px] font-semibold tracking-tight">{displayName}</div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4AF37' }} />
+                <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#D4AF37' }}>Premium Member</span>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
+        {/* Preferences */}
         <div className="glass-card-small p-4">
           <div className="iq-label mb-3">Preferences</div>
-          <div className="flex items-center justify-between">
-            <span className="text-[14px] font-medium">Display currency</span>
-            <button onClick={onToggleCurrency}
-              className="h-9 px-4 rounded-xl font-bold text-[12px]"
-              style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
-              {currency} →
-            </button>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-medium">Base Currency</span>
+              <button onClick={onToggleCurrency}
+                className="h-9 px-4 rounded-xl font-bold text-[13px]"
+                style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+                {currency === 'ILS' ? 'ILS ₪' : 'USD $'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-medium">Notifications</span>
+              <button onClick={toggleNotifications}
+                className="w-12 h-6 rounded-full relative transition-colors"
+                style={{ background: notificationsOn ? '#D4AF37' : 'rgba(255,255,255,0.1)' }}>
+                <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                  style={{ left: notificationsOn ? '26px' : '2px' }} />
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Data & Security */}
+        <div className="glass-card-small p-4">
+          <div className="iq-label mb-3">Data &amp; Security</div>
+          <button onClick={onExportCsv}
+            className="w-full flex items-center justify-between h-11 px-1">
+            <span className="text-[14px] font-medium">Export Ledger CSV</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
 
         {cloudAvailable && (
@@ -1803,6 +1830,200 @@ function AuthSheet({ onClose, onSignedIn }) {
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+// ─── HoldingsScreen ───────────────────────────────────────────────────────────
+function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, onSelectHolding, onDeleteHolding, onMoveHolding }) {
+  const [editMode, setEditMode] = useState(false)
+  const [filter, setFilter] = useState('ALL')
+  const filters = ['ALL', 'US', 'IL', 'CRYPTO']
+
+  const { totalUSD, totalILS } = calculateTotals(holdings, prices, exchangeRate)
+  const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
+  const isAllTimeUp = allTimePct >= 0
+  const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
+
+  const sorted = useMemo(() => [...enriched].sort((a, b) => (b._metrics?.currentValue ?? 0) - (a._metrics?.currentValue ?? 0)), [enriched])
+
+  const filtered = useMemo(() => {
+    const list = [...enriched].sort((a, b) => (b._metrics?.currentValue ?? 0) - (a._metrics?.currentValue ?? 0))
+    return filter === 'ALL' ? list : list.filter(h => h.market === filter)
+  }, [enriched, filter])
+
+  const gainers = useMemo(() => [...enriched].filter(h => h.dayChange > 0).sort((a, b) => b.dayChange - a.dayChange).slice(0, 3), [enriched])
+  const losers = useMemo(() => [...enriched].filter(h => h.dayChange < 0).sort((a, b) => a.dayChange - b.dayChange).slice(0, 3), [enriched])
+
+  if (!enriched.length) {
+    return (
+      <div className="flex flex-col items-center justify-center" style={{
+        height: '100%',
+        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
+      }}>
+        <div className="text-center px-8">
+          <div className="mb-5 flex items-center justify-center">
+            <div style={{ width: 56, height: 56, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(212,175,55,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M3 6h18M3 12h18M3 18h12" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+          <div className="iq-label mb-3">Holdings</div>
+          <div className="text-[16px] font-light text-white/70">No holdings yet</div>
+          <div className="text-[12px] mt-2" style={{ color: '#52525b' }}>Tap + to add your first holding</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-y-auto no-scrollbar" style={{
+      height: '100%',
+      paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
+      paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+    }}>
+      {/* Header */}
+      <div className="flex items-start justify-between px-5 pt-3 pb-2">
+        <div>
+          <div className="text-[26px] font-bold tracking-tight leading-none">HOLDINGS</div>
+          <div className="text-[13px] mt-0.5" style={{ color: '#71717a' }}>האחזקות שלי</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[16px] font-semibold tabular-nums tracking-tight">{totalDisplay}</div>
+          <div className="text-[12px] font-semibold tabular-nums" style={{ color: isAllTimeUp ? '#22c55e' : '#ef4444' }}>
+            {isAllTimeUp ? '+' : ''}{allTimePct.toFixed(2)}%
+          </div>
+        </div>
+      </div>
+
+      {/* Holdings list */}
+      <div className="mx-5 mt-2">
+        <div className="flex items-baseline justify-between px-1 mb-2">
+          <span className="iq-label">Portfolio · {enriched.length}</span>
+          <button onClick={() => setEditMode(m => !m)}
+            className="text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors"
+            style={editMode ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.45)' }}>
+            {editMode ? 'Done' : 'Edit'}
+          </button>
+        </div>
+        <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
+          {(editMode ? enriched : sorted).map((h, i, arr) => (
+            editMode ? (
+              <div key={h.ticker} className="flex items-center gap-2 px-3 py-2">
+                <div className="flex flex-col gap-0.5">
+                  <button disabled={i === 0} onClick={() => onMoveHolding(h.ticker, 'up')}
+                    className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
+                    <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 7l3-3 3 3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
+                  </button>
+                  <button disabled={i === arr.length - 1} onClick={() => onMoveHolding(h.ticker, 'down')}
+                    className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center disabled:opacity-25">
+                    <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3l3 3 3-3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <Logo ticker={h.ticker} size={32} />
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
+                    <div className="text-[11px] truncate" style={{ color: '#71717a' }}>{h.name}</div>
+                  </div>
+                </div>
+                <button onClick={() => { if (confirm(`Remove ${displaySymbol(h.ticker)}?`)) onDeleteHolding(h.ticker) }}
+                  className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-center">
+                  <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                </button>
+              </div>
+            ) : (
+              <HoldingRow key={h.ticker} h={h} onClick={() => onSelectHolding(h)} />
+            )
+          ))}
+        </div>
+      </div>
+
+      {/* Markets / Watchlist */}
+      {(gainers.length > 0 || losers.length > 0) && (
+        <div className="mx-5 mt-5 grid grid-cols-2 gap-3">
+          {gainers.length > 0 && (
+            <div className="glass-card-small p-3">
+              <div className="iq-label mb-2">Top gainers</div>
+              {gainers.map(h => (
+                <button key={h.ticker} onClick={() => onSelectHolding(h)}
+                  className="w-full flex items-center gap-2 py-1.5 bg-transparent border-0 text-left">
+                  <Logo ticker={h.ticker} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
+                  </div>
+                  <div className="text-[12px] font-bold tabular-nums" style={{ color: '#22c55e' }}>+{h.dayChange.toFixed(2)}%</div>
+                </button>
+              ))}
+            </div>
+          )}
+          {losers.length > 0 && (
+            <div className="glass-card-small p-3">
+              <div className="iq-label mb-2">Top losers</div>
+              {losers.map(h => (
+                <button key={h.ticker} onClick={() => onSelectHolding(h)}
+                  className="w-full flex items-center gap-2 py-1.5 bg-transparent border-0 text-left">
+                  <Logo ticker={h.ticker} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
+                  </div>
+                  <div className="text-[12px] font-bold tabular-nums" style={{ color: '#f43f5e' }}>{h.dayChange.toFixed(2)}%</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mx-5 mt-4">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="iq-label">Watchlist · {filtered.length}</span>
+          <div className="flex gap-0.5 p-0.5 rounded-lg bg-black/30">
+            {filters.map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className="px-2 py-0.5 rounded-md text-[9px] font-bold transition-colors"
+                style={filter === f ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
+          {filtered.map(h => {
+            const mktCurrency = h.market === 'IL' ? 'ILS' : 'USD'
+            const price = h._metrics?.effectiveCurrentPrice ?? h.price ?? 0
+            const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
+            const spark = sparklinePoints(h.ticker.charCodeAt(0) * 7 + h.ticker.length * 3)
+            const sparkColor = h.dayChange >= 0 ? '#22c55e' : '#ef4444'
+            return (
+              <button key={h.ticker} onClick={() => onSelectHolding(h)}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-transparent border-0 text-left hover:bg-white/3 transition-colors">
+                <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', display: 'inline-flex' }}>
+                  <Logo ticker={h.ticker} size={34} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-white font-semibold text-[14px] tracking-tight">{displaySymbol(h.ticker)}</span>
+                    <MarketBadge market={h.market} />
+                  </div>
+                  <div className="text-[11px] mt-0.5 truncate" style={{ color: '#71717a' }}>{h.name}</div>
+                </div>
+                <Sparkline data={spark} color={sparkColor} width={48} height={20} />
+                <div className="text-right min-w-[72px]">
+                  <div className="text-white font-semibold text-[14px] tabular-nums">
+                    {price ? formatCurrencyPrecise(h.market === 'IL' ? price / 100 : price, mktCurrency) : '—'}
+                  </div>
+                  <div className="text-[12px] font-medium tabular-nums" style={{ color: dayColor }}>
+                    {h.dayChange === 0 ? '—' : `${h.dayChange > 0 ? '+' : ''}${h.dayChange.toFixed(2)}%`}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1992,7 +2213,7 @@ export default function App() {
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [currency, setCurrency] = useState('USD')
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState('networth')
   const [selected, setSelected] = useState(null)
   const [adding, setAdding] = useState(false)
   const [addingTxn, setAddingTxn] = useState(false)
@@ -2203,19 +2424,9 @@ export default function App() {
 
   // ── FAB context ────────────────────────────────────────────────────────────
   const handleFab = useCallback(() => {
-    if (activeTab === 'activity') setAddingTxn(true)
+    if (activeTab === 'cashflow') setAddingTxn(true)
     else setAdding(true)
   }, [activeTab])
-
-  // ── portfolio totals (shared across screens) ─────────────────────────────
-  const portfolioTotals = useMemo(
-    () => calculateTotals(holdings, prices, exchangeRate),
-    [holdings, prices, exchangeRate]
-  )
-  const allTimeReturn = useMemo(
-    () => calculateAllTimeReturn(holdings, prices, exchangeRate),
-    [holdings, prices, exchangeRate]
-  )
 
   // ── enriched holdings ──────────────────────────────────────────────────────
   const enriched = useMemo(() => holdings.map(holding => {
@@ -2253,18 +2464,15 @@ export default function App() {
           loading={loading}
         />
         <div className="absolute inset-0">
-          {activeTab === 'home' && (
-            <PortfolioScreen
+          {activeTab === 'networth' && (
+            <NetWorthScreen
               holdings={holdings} enriched={enriched} prices={prices}
               exchangeRate={exchangeRate} currency={currency}
               stale={stale}
-              onSelectHolding={setSelected}
-              onDeleteHolding={handleDelete}
-              onMoveHolding={handleMoveHolding}
               transactions={transactions}
             />
           )}
-          {activeTab === 'activity' && (
+          {activeTab === 'cashflow' && (
             <ActivityScreen
               transactions={transactions} budgets={budgets}
               currency={currency} exchangeRate={exchangeRate}
@@ -2275,23 +2483,23 @@ export default function App() {
               onExportCsv={handleExportCsv}
             />
           )}
-          {activeTab === 'markets' && (
-            <MarketsScreen
-              enriched={enriched}
+          {activeTab === 'holdings' && (
+            <HoldingsScreen
+              holdings={holdings} enriched={enriched} prices={prices}
+              exchangeRate={exchangeRate} currency={currency}
               onSelectHolding={setSelected}
+              onDeleteHolding={handleDelete}
+              onMoveHolding={handleMoveHolding}
             />
           )}
-          {activeTab === 'you' && (
-            <YouScreen
+          {activeTab === 'settings' && (
+            <SettingsScreen
               currency={currency} onToggleCurrency={toggleCurrency}
+              onExportCsv={handleExportCsv}
               cloudAvailable={supabaseConfigured}
               session={session} syncing={syncing}
               onSignIn={() => setShowAuth(true)}
               onSignOut={handleSignOut}
-              holdings={holdings}
-              totalUSD={portfolioTotals.totalUSD}
-              totalILS={portfolioTotals.totalILS}
-              allTimePct={allTimeReturn.pct}
             />
           )}
         </div>
