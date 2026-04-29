@@ -393,6 +393,15 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
               value={metrics ? formatCurrency(metrics.adjustedCostBasis, currency) : '—'} />
             <DetailStat label="Break-even"
               value={metrics ? formatCurrencyPrecise(metrics.breakEven, currency) : '—'} />
+            {h._holding.fees > 0 && (
+              <DetailStat label="Fees paid"
+                value={formatCurrency(h._holding.fees, currency)} />
+            )}
+            {h._holding.dividends > 0 && (
+              <DetailStat label="Dividends"
+                value={formatCurrency(h._holding.dividends, currency)}
+                color="#22c55e" />
+            )}
           </div>
         </div>
 
