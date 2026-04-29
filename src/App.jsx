@@ -1478,14 +1478,17 @@ function ActivityScreen({
               ⋯
             </button>
             {showOverflow && (
-              <div className="absolute right-0 top-10 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]">
-                {[['Manage budgets', onOpenBudgets], ['Recurring', onOpenRecurring], ['Export CSV', onExportCsv]].map(([lbl, fn]) => (
-                  <button key={lbl} onClick={() => { fn(); setShowOverflow(false) }}
-                    className="w-full px-4 py-3 text-left text-[13px] font-medium text-white/80 hover:bg-white/5 border-b border-white/5 last:border-0">
-                    {lbl}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowOverflow(false)} />
+                <div className="absolute right-0 top-10 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]">
+                  {[['Manage budgets', onOpenBudgets], ['Recurring', onOpenRecurring], ['Export CSV', onExportCsv]].map(([lbl, fn]) => (
+                    <button key={lbl} onClick={() => { fn(); setShowOverflow(false) }}
+                      className="w-full px-4 py-3 text-left text-[13px] font-medium text-white/80 hover:bg-white/5 border-b border-white/5 last:border-0">
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
