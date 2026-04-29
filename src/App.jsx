@@ -667,18 +667,7 @@ function TabBtn({ icon, label, active, onClick }) {
 }
 
 // ─── PortfolioScreen ──────────────────────────────────────────────────────────
-const formatUpdatedAt = (date) => {
-  if (!date) return null
-  const d = new Date(date)
-  const month = d.toLocaleString('en-US', { month: 'short' })
-  const day = d.getDate()
-  const year = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `Updated ${month} ${day}, ${year} · ${hh}:${mm}`
-}
-
-function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding, onDeleteHolding, onMoveHolding, transactions }) {
+function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, stale, onSelectHolding, onDeleteHolding, onMoveHolding, transactions }) {
   const [editMode, setEditMode] = useState(false)
   const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
@@ -761,8 +750,6 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
   }, [enriched, exchangeRate])
 
   const allocationSlices = allocTab === 'asset' ? assetSlices : allocTab === 'sector' ? sectorValues : geoSlices
-
-  const updatedText = formatUpdatedAt(lastUpdated)
 
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
@@ -1336,7 +1323,7 @@ function formatDateLabel(isoDate) {
 
 function ActivityScreen({
   transactions, budgets, currency, exchangeRate,
-  onToggleCurrency, onOpenBudgets, onOpenRecurring, onEditTxn, onSaveTxn, onExportCsv,
+  onOpenBudgets, onOpenRecurring, onEditTxn, onSaveTxn, onExportCsv,
 }) {
   const now = new Date()
   const [viewYear, setViewYear] = useState(now.getFullYear())
@@ -1799,8 +1786,6 @@ export default function App() {
   const [exchangeRate, setExchangeRate] = useState(3.7)
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState(null)
-
   // ── cash flow state ────────────────────────────────────────────────────────
   const [transactions, setTransactions] = useState(() => loadTransactions())
   const [budgets, setBudgets] = useState(() => loadBudgets())
@@ -1907,7 +1892,6 @@ export default function App() {
       setPrices(priceMap)
       setExchangeRate(rate)
       savePricesCache(priceMap)
-      setLastUpdated(Date.now())
     } catch {
       setStale(true)
     } finally {
@@ -2084,8 +2068,7 @@ export default function App() {
             <PortfolioScreen
               holdings={holdings} enriched={enriched} prices={prices}
               exchangeRate={exchangeRate} currency={currency}
-              onToggleCurrency={toggleCurrency} onRefresh={refresh}
-              loading={loading} stale={stale} lastUpdated={lastUpdated}
+              stale={stale}
               onSelectHolding={setSelected}
               onDeleteHolding={handleDelete}
               onMoveHolding={handleMoveHolding}
@@ -2096,7 +2079,6 @@ export default function App() {
             <ActivityScreen
               transactions={transactions} budgets={budgets}
               currency={currency} exchangeRate={exchangeRate}
-              onToggleCurrency={toggleCurrency}
               onOpenBudgets={() => setManagingBudgets(true)}
               onOpenRecurring={() => setManagingRecurring(true)}
               onEditTxn={setEditingTxn}
