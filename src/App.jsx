@@ -12,6 +12,7 @@ import {
   loadRecurring, saveRecurring,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
 } from './utils'
+import { callGemini } from './gemini'
 import {
   fetchPrices, supabaseConfigured,
   getSession, signInWithPassword, signUp, signOut, onAuthChange,
@@ -677,13 +678,47 @@ const formatUpdatedAt = (date) => {
   return `Updated ${month} ${day}, ${year} · ${hh}:${mm}`
 }
 
-function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding, onDeleteHolding, onMoveHolding }) {
+function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, onToggleCurrency, onRefresh, loading, stale, lastUpdated, onSelectHolding, onDeleteHolding, onMoveHolding, transactions }) {
   const [editMode, setEditMode] = useState(false)
   const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
   const [range, setRange] = useState('1M')
   const [allocTab, setAllocTab] = useState('geo')
   const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
+
+  const geminiKey = import.meta.env.VITE_GEMINI_KEY
+  const [insights, setInsights] = useState('')
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [insightsError, setInsightsError] = useState('')
+  const [insightsOpen, setInsightsOpen] = useState(false)
+
+  async function handleGetInsights() {
+    setInsightsLoading(true)
+    setInsightsError('')
+    setInsightsOpen(true)
+    try {
+      const portfolioSummary = enriched.map(h =>
+        `${displaySymbol(h.ticker)} (${h.market}): ${h.qty} shares @ ${formatCurrency(h._metrics?.effectiveCurrentPrice ?? 0, h.market === 'IL' ? 'ILS' : 'USD')}, value ${formatCurrency(h._metrics?.currentValue ?? 0, h.market === 'IL' ? 'ILS' : 'USD')}, ROI ${h._metrics?.roiPct?.toFixed(1) ?? 0}%`
+      ).join('\n')
+      const recentTxns = (transactions || []).slice(-20).map(t =>
+        `${t.date} ${t.type} ${t.category} ${formatCurrency(t.amount, t.currency)}${t.note ? ' — ' + t.note : ''}`
+      ).join('\n')
+      const totalVal = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
+      const payload = {
+        contents: [{
+          parts: [{
+            text: `You are a concise personal finance advisor. Analyze this portfolio and provide 3–5 bullet-point insights covering diversification, performance, risk, and one actionable recommendation. Be brief.\n\nTotal net worth: ${totalVal}\nAll-time return: ${allTimePct.toFixed(2)}%\n\nHoldings:\n${portfolioSummary || 'None'}\n\nRecent transactions (last 20):\n${recentTxns || 'None'}`,
+          }],
+        }],
+      }
+      const result = await callGemini(payload)
+      setInsights(result)
+    } catch {
+      setInsightsError('Unable to fetch insights')
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
 
   const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
   const isGainUp = gainUSD >= 0
@@ -738,6 +773,38 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       {stale && (
         <div className="mx-5 mt-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
           ⚠ Could not fetch live prices — showing cached data.
+        </div>
+      )}
+
+      {/* AI Insights */}
+      {geminiKey && (
+        <div className="mx-5 mt-4">
+          <button onClick={handleGetInsights} disabled={insightsLoading}
+            className="w-full flex items-center justify-center gap-2 h-10 rounded-2xl text-[11px] font-semibold disabled:opacity-60"
+            style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={insightsLoading ? 'animate-spin' : ''}>
+              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" stroke="#D4AF37" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z" stroke="#D4AF37" strokeWidth="1.5" strokeLinejoin="round" />
+            </svg>
+            {insightsLoading ? 'Analyzing…' : 'Get AI Insights'}
+          </button>
+          {insightsOpen && (
+            <div className="mt-2 glass-panel rounded-2xl px-4 py-3">
+              {insightsError ? (
+                <p className="text-[12px]" style={{ color: '#71717a' }}>{insightsError}</p>
+              ) : insightsLoading ? (
+                <p className="text-[12px]" style={{ color: '#71717a' }}>Thinking…</p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="iq-label">AI Insights</span>
+                    <button onClick={() => setInsightsOpen(false)} className="text-white/30 text-[16px] leading-none">×</button>
+                  </div>
+                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-300">{insights}</p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1269,13 +1336,64 @@ function formatDateLabel(isoDate) {
 
 function ActivityScreen({
   transactions, budgets, currency, exchangeRate,
-  onToggleCurrency, onOpenBudgets, onOpenRecurring, onEditTxn, onExportCsv,
+  onToggleCurrency, onOpenBudgets, onOpenRecurring, onEditTxn, onSaveTxn, onExportCsv,
 }) {
   const now = new Date()
   const [viewYear, setViewYear] = useState(now.getFullYear())
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1)
   const [catTab, setCatTab] = useState('EXPENSE')
   const [showOverflow, setShowOverflow] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const scanInputRef = useRef(null)
+  const geminiKey = import.meta.env.VITE_GEMINI_KEY
+  const todayIso = new Date().toISOString().slice(0, 10)
+
+  async function handleScanFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setScanning(true)
+    try {
+      let parts
+      if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+        const text = await file.text()
+        parts = [{
+          text: `Parse financial transactions from this CSV and return ONLY a JSON array, no explanation.\nEach item: {"amount":number,"category":string,"note":string,"currency":"USD"|"ILS","type":"INCOME"|"EXPENSE"}\nExpense categories: ${EXPENSE_CATEGORIES.join(', ')}\nIncome categories: ${INCOME_CATEGORIES.join(', ')}\n\nCSV:\n${text}`,
+        }]
+      } else {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        parts = [
+          { inline_data: { mime_type: file.type || 'image/jpeg', data: base64 } },
+          { text: `Parse financial transactions from this document and return ONLY a JSON array, no explanation.\nEach item: {"amount":number,"category":string,"note":string,"currency":"USD"|"ILS","type":"INCOME"|"EXPENSE"}\nExpense categories: ${EXPENSE_CATEGORIES.join(', ')}\nIncome categories: ${INCOME_CATEGORIES.join(', ')}` },
+        ]
+      }
+      const parsed = await callGemini({ contents: [{ parts }] }, true)
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No transactions found')
+      let saved = 0
+      for (const item of parsed) {
+        if (!item.amount || !item.type) continue
+        onSaveTxn({
+          type: item.type,
+          amount: Number(item.amount),
+          currency: item.currency || currency,
+          category: item.category || (item.type === 'INCOME' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]),
+          note: item.note || '',
+          date: todayIso,
+        })
+        saved++
+      }
+      if (saved === 0) throw new Error('No valid transactions found')
+    } catch (err) {
+      alert('Scan failed: ' + (err?.message || 'Could not parse document'))
+    } finally {
+      setScanning(false)
+    }
+  }
 
   const monthTxns = useMemo(
     () => transactions.filter(t => t.date?.startsWith(`${viewYear}-${String(viewMonth).padStart(2, '0')}`)),
@@ -1317,6 +1435,10 @@ function ActivityScreen({
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
+      {/* Hidden file input for scan */}
+      <input ref={scanInputRef} type="file" accept=".csv,image/*,.pdf"
+        className="hidden" onChange={handleScanFile} />
+
       {/* Month picker */}
       <div className="flex items-center justify-between px-5 py-3">
         <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
@@ -1329,6 +1451,22 @@ function ActivityScreen({
           <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
             <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
+          {geminiKey && (
+            <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
+              className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 text-[10px] font-semibold disabled:opacity-50"
+              style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+              {scanning ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="animate-spin">
+                  <circle cx="12" cy="12" r="10" stroke="#D4AF37" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+              Scan
+            </button>
+          )}
           <div className="relative">
             <button onClick={() => setShowOverflow(v => !v)}
               className="w-8 h-8 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/50 text-[16px]">
@@ -1923,6 +2061,7 @@ export default function App() {
               onToggleCurrency={toggleCurrency} onRefresh={refresh}
               loading={loading} stale={stale} lastUpdated={lastUpdated}
               onSelectHolding={setSelected}
+              transactions={transactions}
             />
           )}
           {activeTab === 'activity' && (
@@ -1933,6 +2072,7 @@ export default function App() {
               onOpenBudgets={() => setManagingBudgets(true)}
               onOpenRecurring={() => setManagingRecurring(true)}
               onEditTxn={setEditingTxn}
+              onSaveTxn={handleSaveTxn}
               onExportCsv={handleExportCsv}
             />
           )}
