@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
-  isCrypto, getMarket, displaySymbol,
+  isCrypto, isILStock, getMarket, displaySymbol,
   formatCurrency, calculateTotals, calculateAllTimeReturn,
   loadHoldings, saveHoldings, loadPricesCache, savePricesCache,
   calculateHoldingMetrics,
@@ -251,13 +251,15 @@ function HoldingRow({ h, onClick }) {
   return (
     <div onClick={onClick}
       className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5">
-      <Logo ticker={h.ticker} size={40} />
+      <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', display: 'inline-flex' }}>
+        <Logo ticker={h.ticker} size={36} />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-white font-semibold text-[15px] tracking-tight">{display}</span>
           <MarketBadge market={h.market} />
         </div>
-        <div className="text-white/45 text-[12px] mt-0.5 truncate">
+        <div className="text-[12px] mt-0.5 truncate" style={{ color: '#71717a' }}>
           {h.qty < 1 ? h.qty.toFixed(4) : h.qty.toLocaleString()} · {h.name}
         </div>
       </div>
@@ -349,7 +351,8 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         <div className="flex gap-1 mt-2 p-1 rounded-xl bg-white/4">
           {ranges.map(r => (
             <button key={r} onClick={() => setRange(r)}
-              className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${range === r ? 'bg-white/10 text-white' : 'text-white/45'}`}>
+              className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
+              style={range === r ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.4)' }}>
               {r}
             </button>
           ))}
@@ -481,13 +484,16 @@ function AddHoldingSheet({ onClose, onAdd }) {
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <div className="relative text-white rounded-t-[28px] p-5"
         style={{
-          background: '#0E0E10',
-          boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
+          background: '#0A0A0A',
+          boxShadow: '0 -20px 40px rgba(0,0,0,0.6)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)',
         }}>
-        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-5">
-          <span className="text-[20px] font-bold tracking-tight">Add holding</span>
+          <div>
+            <div className="iq-label mb-1">Portfolio</div>
+            <span className="text-[20px] font-light tracking-tight">Add holding</span>
+          </div>
           <button onClick={onClose}
             className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
         </div>
@@ -538,7 +544,7 @@ function AddHoldingSheet({ onClose, onAdd }) {
 
         <button onClick={handleSubmit}
           className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
-          style={{ background: '#22c55e', boxShadow: '0 10px 30px rgba(34,197,94,0.3)' }}>
+          style={{ background: '#D4AF37', boxShadow: '0 10px 30px rgba(212,175,55,0.25)' }}>
           Save investment
         </button>
       </div>
@@ -549,8 +555,52 @@ function AddHoldingSheet({ onClose, onAdd }) {
 function SheetField({ label, children }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">{label}</div>
+      <div className="iq-label mb-1.5">{label}</div>
       {children}
+    </div>
+  )
+}
+
+// ─── AppHeader ────────────────────────────────────────────────────────────────
+function AppHeader({ currency, onToggleCurrency, onRefresh, loading }) {
+  return (
+    <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-5"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+        paddingBottom: '12px',
+        background: 'rgba(5,5,5,0.85)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderBottom: '1px solid rgba(255,255,255,0.03)',
+      }}>
+      <div className="flex items-center gap-2.5">
+        <div style={{
+          width: 7, height: 7, borderRadius: '50%',
+          background: '#D4AF37',
+          boxShadow: '0 0 10px rgba(212,175,55,0.7)',
+        }} />
+        <span style={{
+          fontWeight: 300,
+          fontSize: 13,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'white',
+        }}>IQ.FINANCE</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={onToggleCurrency}
+          className="h-7 px-3 rounded-full text-[10px] font-semibold"
+          style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+          {currency}
+        </button>
+        <button onClick={onRefresh} disabled={loading}
+          className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-40"
+          style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={loading ? 'animate-spin' : ''}>
+            <path d="M21 12a9 9 0 11-3.5-7.1M21 3v6h-6" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }
@@ -565,15 +615,17 @@ const TAB_PATHS = {
 
 function TabBar({ activeTab, onTabChange, onAdd }) {
   const tabIcon = (key, active) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <path d={TAB_PATHS[key]} stroke={active ? '#22c55e' : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d={TAB_PATHS[key]} stroke={active ? '#D4AF37' : '#52525b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-1"
+    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-2"
       style={{
-        background: 'linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.9) 40%)',
-        backdropFilter: 'blur(12px)',
+        background: 'rgba(5,5,5,0.92)',
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)',
+        borderTop: '1px solid rgba(255,255,255,0.03)',
         paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
       }}>
       <TabBtn icon={tabIcon('home', activeTab === 'home')} label="Home"
@@ -582,9 +634,9 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
         active={activeTab === 'markets'} onClick={() => onTabChange('markets')} />
       <div className="flex-1 flex justify-center">
         <button onClick={onAdd}
-          className="w-[48px] h-[48px] rounded-full flex items-center justify-center -translate-y-1 font-bold"
-          style={{ background: '#22c55e', boxShadow: '0 6px 20px rgba(34,197,94,0.4)' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          className="w-[44px] h-[44px] rounded-full flex items-center justify-center -translate-y-1"
+          style={{ background: '#D4AF37', boxShadow: '0 6px 20px rgba(212,175,55,0.35)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </button>
@@ -600,10 +652,15 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
 function TabBtn({ icon, label, active, onClick }) {
   return (
     <button onClick={onClick}
-      className="flex-1 flex flex-col items-center gap-1 bg-transparent border-0 p-0">
+      className="flex-1 flex flex-col items-center gap-0.5 bg-transparent border-0 p-0 py-1">
       {icon}
-      <span className={`text-[10px] font-semibold ${active ? 'text-emerald-400' : 'text-white/30'}`}>{label}</span>
-      {active ? <div className="w-1 h-1 rounded-full bg-emerald-400" /> : <div className="w-1 h-1" />}
+      <span style={{
+        fontSize: 7,
+        letterSpacing: '0.2em',
+        textTransform: 'uppercase',
+        fontWeight: 600,
+        color: active ? '#D4AF37' : '#52525b',
+      }}>{label}</span>
     </button>
   )
 }
@@ -676,37 +733,8 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
-      paddingTop: 'env(safe-area-inset-top)',
+      paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
-      {/* Header */}
-      <div className="px-5 pt-3 pb-1 flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="text-[12px] text-white/45 font-medium">My Portfolio</div>
-          <div className="text-[28px] font-bold tracking-tight leading-tight">Overview</div>
-          {updatedText && (
-            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/45">
-              <span className="relative inline-flex w-1.5 h-1.5">
-                <span className="absolute inset-0 rounded-full bg-emerald-400/60 animate-ping" />
-                <span className="relative w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              </span>
-              {updatedText}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2 pt-5">
-          <button onClick={onToggleCurrency}
-            className="h-9 px-3 rounded-xl border border-white/8 bg-white/4 text-white font-bold text-[12px]">
-            {currency}
-          </button>
-          <button onClick={onRefresh} disabled={loading}
-            className="w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center disabled:opacity-40">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={loading ? 'animate-spin' : ''}>
-              <path d="M21 12a9 9 0 11-3.5-7.1M21 3v6h-6" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
       {stale && (
         <div className="mx-5 mt-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
           ⚠ Could not fetch live prices — showing cached data.
@@ -716,11 +744,13 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       {/* Hero card */}
       <div className="mx-5 mt-4">
         <div className="glass-card p-5 relative overflow-hidden">
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Total net worth</div>
-          <div className="text-[44px] font-bold tracking-tighter leading-none tabular-nums mb-3">
-            {holdings.length ? totalDisplay : (currency === 'ILS' ? '₪0' : '$0')}
+          <div className="iq-label mb-2">Total net worth</div>
+          <div className="text-center mb-1">
+            <div className="text-[48px] tabular-nums leading-none" style={{ fontWeight: 200, letterSpacing: '-0.03em' }}>
+              {holdings.length ? totalDisplay : (currency === 'ILS' ? '₪0' : '$0')}
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap mb-4">
+          <div className="flex items-center justify-center gap-2 flex-wrap mb-4 mt-2">
             {holdings.length > 0 && (
               <>
                 <span className="text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5"
@@ -752,7 +782,8 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
           <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
             {ranges.map(r => (
               <button key={r} onClick={() => setRange(r)}
-                className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${range === r ? 'bg-white/10 text-white' : 'text-white/40'}`}>
+                className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors"
+                style={range === r ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
                 {r}
               </button>
             ))}
@@ -765,11 +796,12 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
         <div className="mx-5 mt-3">
           <div className="glass-card-small p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[12px] font-bold uppercase tracking-widest text-white/70">Allocation</div>
+              <div className="iq-label">Allocation</div>
               <div className="flex gap-0.5 p-0.5 rounded-lg bg-black/30">
                 {[['geo','Geo'],['asset','Asset'],['sector','Sector']].map(([key,label]) => (
                   <button key={key} onClick={() => setAllocTab(key)}
-                    className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-colors ${allocTab === key ? 'bg-white/12 text-white' : 'text-white/35'}`}>
+                    className="px-2.5 py-1 rounded-md text-[9px] font-bold transition-colors"
+                    style={allocTab === key ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
                     {label}
                   </button>
                 ))}
@@ -793,11 +825,10 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
       {enriched.length > 0 && (
         <div className="mx-5 mt-4">
           <div className="flex items-baseline justify-between px-1 mb-2">
-            <span className="text-[12px] font-bold uppercase tracking-widest text-white/70">
-              Holdings · {enriched.length}
-            </span>
+            <span className="iq-label">Holdings · {enriched.length}</span>
             <button onClick={() => setEditMode(m => !m)}
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors ${editMode ? 'bg-emerald-500/20 text-emerald-400' : 'text-white/50 hover:text-white/80'}`}>
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors"
+              style={editMode ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.45)' }}>
               {editMode ? 'Done' : 'Edit'}
             </button>
           </div>
@@ -902,13 +933,14 @@ function TransactionRow({ txn, displayCurrency, exchangeRate, onClick }) {
   const color = isIncome ? '#22c55e' : '#f43f5e'
   return (
     <button onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5 bg-transparent border-0 text-left">
+      className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5 bg-transparent border-0 text-left relative overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: color, opacity: 0.7 }} />
       <CategoryIcon category={txn.category} type={txn.type} size={40} />
       <div className="flex-1 min-w-0">
         <div className="text-white font-semibold text-[15px] tracking-tight truncate">
           {txn.category}
         </div>
-        <div className="text-white/45 text-[12px] mt-0.5 truncate">
+        <div className="text-[12px] mt-0.5 truncate" style={{ color: '#71717a' }}>
           {txn.note ? txn.note : isIncome ? 'Income' : 'Expense'}
         </div>
       </div>
@@ -917,7 +949,7 @@ function TransactionRow({ txn, displayCurrency, exchangeRate, onClick }) {
           {sign}{formatCurrency(converted, displayCurrency)}
         </div>
         {txn.currency !== displayCurrency && (
-          <div className="text-[11px] text-white/40 tabular-nums mt-0.5">
+          <div className="text-[11px] tabular-nums mt-0.5" style={{ color: '#71717a' }}>
             {formatCurrency(txn.amount, txn.currency)}
           </div>
         )}
@@ -962,13 +994,16 @@ function AddTransactionSheet({ initial, defaultCurrency, onClose, onSave, onDele
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
         style={{
-          background: '#0E0E10',
-          boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
+          background: '#0A0A0A',
+          boxShadow: '0 -20px 40px rgba(0,0,0,0.6)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)',
         }}>
-        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-5">
-          <span className="text-[20px] font-bold tracking-tight">{isEdit ? 'Edit transaction' : 'New transaction'}</span>
+          <div>
+            <div className="iq-label mb-1">Cash flow</div>
+            <span className="text-[20px] font-light tracking-tight">{isEdit ? 'Edit transaction' : 'New transaction'}</span>
+          </div>
           <button onClick={onClose}
             className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
         </div>
@@ -1042,7 +1077,7 @@ function AddTransactionSheet({ initial, defaultCurrency, onClose, onSave, onDele
 
         <button onClick={handleSubmit}
           className="w-full h-[52px] mt-4 rounded-2xl font-bold text-[15px] tracking-tight text-black"
-          style={{ background: '#22c55e', boxShadow: '0 10px 30px rgba(34,197,94,0.3)' }}>
+          style={{ background: '#D4AF37', boxShadow: '0 10px 30px rgba(212,175,55,0.25)' }}>
           {isEdit ? 'Save changes' : 'Save transaction'}
         </button>
       </div>
@@ -1074,10 +1109,13 @@ function BudgetSheet({ budgets, defaultCurrency, onClose, onSave, onDelete }) {
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <div className="relative text-white rounded-t-[28px] p-5 max-h-[88dvh] overflow-y-auto"
-        style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
-        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        style={{ background: '#0A0A0A', boxShadow: '0 -20px 40px rgba(0,0,0,0.6)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-4">
-          <span className="text-[20px] font-bold tracking-tight">Monthly budgets</span>
+          <div>
+            <div className="iq-label mb-1">Activity</div>
+            <span className="text-[20px] font-light tracking-tight">Monthly budgets</span>
+          </div>
           <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
         </div>
         <div className="space-y-2">
@@ -1103,7 +1141,7 @@ function BudgetSheet({ budgets, defaultCurrency, onClose, onSave, onDelete }) {
         </div>
         <button onClick={handleSaveAll}
           className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
-          style={{ background: '#22c55e', boxShadow: '0 10px 30px rgba(34,197,94,0.3)' }}>
+          style={{ background: '#D4AF37', boxShadow: '0 10px 30px rgba(212,175,55,0.25)' }}>
           Save budgets
         </button>
       </div>
@@ -1131,10 +1169,13 @@ function RecurringSheet({ templates, defaultCurrency, onClose, onSave, onDelete 
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
-        style={{ background: '#0E0E10', boxShadow: '0 -20px 40px rgba(0,0,0,0.5)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
-        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        style={{ background: '#0A0A0A', boxShadow: '0 -20px 40px rgba(0,0,0,0.6)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-4">
-          <span className="text-[20px] font-bold tracking-tight">Recurring</span>
+          <div>
+            <div className="iq-label mb-1">Activity</div>
+            <span className="text-[20px] font-light tracking-tight">Recurring</span>
+          </div>
           <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
         </div>
         {templates.length === 0 && !adding && (
@@ -1200,7 +1241,7 @@ function RecurringSheet({ templates, defaultCurrency, onClose, onSave, onDelete 
             </SheetField>
             <div className="flex gap-2 mt-2">
               <button onClick={() => setAdding(false)} className="flex-1 h-11 rounded-2xl bg-white/5 text-white/70 font-semibold text-[13px]">Cancel</button>
-              <button onClick={handleAdd} className="flex-1 h-11 rounded-2xl font-bold text-[13px] text-black" style={{ background: '#22c55e' }}>Add</button>
+              <button onClick={handleAdd} className="flex-1 h-11 rounded-2xl font-bold text-[13px] text-black" style={{ background: '#D4AF37' }}>Add</button>
             </div>
           </div>
         ) : (
@@ -1274,27 +1315,27 @@ function ActivityScreen({
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
-      paddingTop: 'env(safe-area-inset-top)',
+      paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
-      {/* Header */}
-      <div className="px-5 pt-3 pb-1 flex items-center justify-between gap-2">
-        <div>
-          <div className="text-[12px] text-white/45 font-medium">Cash flow</div>
-          <div className="text-[28px] font-bold tracking-tight leading-tight">Activity</div>
-        </div>
-        <div className="flex items-center gap-2 pt-4">
-          <button onClick={onToggleCurrency}
-            className="h-9 px-3 rounded-xl border border-white/8 bg-white/4 text-white font-bold text-[12px]">
-            {currency}
+      {/* Month picker */}
+      <div className="flex items-center justify-between px-5 py-3">
+        <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+        <span className="text-[15px] font-bold tracking-tight" style={{ color: '#D4AF37' }}>
+          {MONTH_NAMES[viewMonth - 1]} {viewYear}
+        </span>
+        <div className="flex items-center gap-2">
+          <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+            <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
           <div className="relative">
             <button onClick={() => setShowOverflow(v => !v)}
-              className="w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/60 text-[18px]">
+              className="w-8 h-8 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/50 text-[16px]">
               ⋯
             </button>
             {showOverflow && (
-              <div className="absolute right-0 top-11 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]"
-                onBlur={() => setShowOverflow(false)}>
+              <div className="absolute right-0 top-10 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]">
                 {[['Manage budgets', onOpenBudgets], ['Recurring', onOpenRecurring], ['Export CSV', onExportCsv]].map(([lbl, fn]) => (
                   <button key={lbl} onClick={() => { fn(); setShowOverflow(false) }}
                     className="w-full px-4 py-3 text-left text-[13px] font-medium text-white/80 hover:bg-white/5 border-b border-white/5 last:border-0">
@@ -1305,19 +1346,6 @@ function ActivityScreen({
             )}
           </div>
         </div>
-      </div>
-
-      {/* Month picker */}
-      <div className="flex items-center justify-center gap-4 px-5 py-2">
-        <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
-          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-        <span className="text-[15px] font-bold tracking-tight">
-          {MONTH_NAMES[viewMonth - 1]} {viewYear}
-        </span>
-        <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
-          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
       </div>
 
       {/* Sparkline */}
@@ -1347,7 +1375,7 @@ function ActivityScreen({
               ['Net', totals.net, netColor],
             ].map(([lbl, val, clr]) => (
               <div key={lbl} className={lbl !== 'Income' ? 'border-l border-white/5 pl-3' : ''}>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-white/40 mb-1">{lbl}</div>
+                <div className={lbl === 'Net' ? 'iq-label mb-1' : 'text-[10px] font-semibold uppercase tracking-widest text-white/40 mb-1'}>{lbl}</div>
                 <div className="text-[17px] font-bold tabular-nums tracking-tight" style={{ color: clr }}>
                   {lbl === 'Expenses' ? '−' : ''}{formatCurrency(Math.abs(val), currency)}
                 </div>
@@ -1448,19 +1476,16 @@ function YouScreen({
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
-      paddingTop: 'env(safe-area-inset-top)',
+      paddingTop: 'calc(env(safe-area-inset-top) + 60px)',
     }}>
-      <div className="px-5 pt-3 pb-4">
-        <div className="text-[12px] text-white/45 font-medium">Settings</div>
-        <div className="text-[28px] font-bold tracking-tight">You</div>
-      </div>
       <div className="mx-5 space-y-3">
         <div className="glass-card-small p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45 mb-3">Preferences</div>
+          <div className="iq-label mb-3">Preferences</div>
           <div className="flex items-center justify-between">
             <span className="text-[14px] font-medium">Display currency</span>
             <button onClick={onToggleCurrency}
-              className="h-9 px-4 rounded-xl border border-white/8 bg-white/4 text-white font-bold text-[12px]">
+              className="h-9 px-4 rounded-xl font-bold text-[12px]"
+              style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
               {currency} →
             </button>
           </div>
@@ -1469,13 +1494,14 @@ function YouScreen({
         {cloudAvailable && (
           <div className="glass-card-small p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[11px] font-semibold uppercase tracking-widest text-white/45">Cloud sync</div>
+              <div className="iq-label">Cloud sync</div>
               {syncing && <div className="text-[10px] text-emerald-400">Syncing…</div>}
             </div>
             {session ? (
               <>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 font-bold text-[14px]">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-[14px]"
+                    style={{ background: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.5)', color: '#D4AF37' }}>
                     {email?.[0]?.toUpperCase() || '·'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1490,12 +1516,12 @@ function YouScreen({
               </>
             ) : (
               <>
-                <div className="text-[12px] text-white/55 leading-relaxed mb-3">
+                <div className="text-[12px] leading-relaxed mb-3" style={{ color: '#71717a' }}>
                   Optional: sign in to sync holdings, transactions, and budgets across all your devices.
                 </div>
                 <button onClick={onSignIn}
                   className="w-full h-10 rounded-xl text-black font-bold text-[12px]"
-                  style={{ background: '#22c55e' }}>
+                  style={{ background: '#D4AF37' }}>
                   Sign in / Create account
                 </button>
               </>
@@ -1543,30 +1569,33 @@ function AuthSheet({ onClose, onSignedIn }) {
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <form onSubmit={handleSubmit} className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
         style={{
-          background: '#0E0E10',
-          boxShadow: '0 -20px 40px rgba(0,0,0,0.5)',
+          background: '#0A0A0A',
+          boxShadow: '0 -20px 40px rgba(0,0,0,0.6)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)',
         }}>
-        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+        <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[20px] font-bold tracking-tight">
-            {mode === 'signup' ? 'Create account' : 'Sign in'}
-          </span>
+          <div>
+            <div className="iq-label mb-1">Account</div>
+            <span className="text-[20px] font-light tracking-tight">
+              {mode === 'signup' ? 'Create account' : 'Sign in'}
+            </span>
+          </div>
           <button type="button" onClick={onClose}
             className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
         </div>
-        <div className="text-[12px] text-white/50 leading-relaxed mb-4">
+        <div className="text-[12px] leading-relaxed mb-4" style={{ color: '#71717a' }}>
           Your local data will be merged with the cloud on first sign-in.
         </div>
 
         <div className="space-y-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Email</div>
+            <div className="iq-label mb-1.5">Email</div>
             <input className="sheet-input" type="email" autoComplete="email"
               value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/45 mb-1.5">Password</div>
+            <div className="iq-label mb-1.5">Password</div>
             <input className="sheet-input" type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
@@ -1578,13 +1607,13 @@ function AuthSheet({ onClose, onSignedIn }) {
 
         <button type="submit" disabled={busy}
           className="w-full h-[48px] mt-5 rounded-2xl font-bold text-[14px] tracking-tight text-black disabled:opacity-50"
-          style={{ background: '#22c55e' }}>
+          style={{ background: '#D4AF37' }}>
           {busy ? '…' : mode === 'signup' ? 'Create account' : 'Sign in'}
         </button>
 
         <div className="mt-4 text-center text-[12px] text-white/50">
           {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button type="button" className="text-emerald-400 font-semibold"
+          <button type="button" style={{ color: '#D4AF37' }} className="font-semibold"
             onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setInfo('') }}>
             {mode === 'signup' ? 'Sign in' : 'Create one'}
           </button>
@@ -1599,6 +1628,7 @@ function MarketsScreen() {
   return (
     <div className="flex items-center justify-center" style={{
       height: '100%',
+      paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
     }}>
       <div className="text-center px-8">
@@ -1874,11 +1904,17 @@ export default function App() {
     <div className="bg-[#050505] text-white" style={{
       height: '100dvh',
       overflow: 'hidden',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
       WebkitFontSmoothing: 'antialiased',
       backgroundImage: 'radial-gradient(at 85% 15%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(at 10% 85%, rgba(37,99,235,0.06), transparent 60%)',
     }}>
       <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
+        <AppHeader
+          currency={currency}
+          onToggleCurrency={toggleCurrency}
+          onRefresh={refresh}
+          loading={loading}
+        />
         <div className="absolute inset-0">
           {activeTab === 'home' && (
             <PortfolioScreen
