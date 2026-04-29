@@ -1926,6 +1926,19 @@ export default function App() {
     if (userId) deleteHoldingBySymbol(symbol, userId).catch(console.error)
   }, [userId])
 
+  const handleMoveHolding = useCallback((symbol, direction) => {
+    setHoldings(prev => {
+      const idx = prev.findIndex(h => h.symbol === symbol)
+      if (idx < 0) return prev
+      const next = [...prev]
+      const swap = direction === 'up' ? idx - 1 : idx + 1
+      if (swap < 0 || swap >= next.length) return prev
+      ;[next[idx], next[swap]] = [next[swap], next[idx]]
+      saveHoldings(next)
+      return next
+    })
+  }, [])
+
   // ── transaction handlers ───────────────────────────────────────────────────
   const handleSaveTxn = useCallback((txn) => {
     const isNew = !txn.id
@@ -2044,7 +2057,7 @@ export default function App() {
       overflow: 'hidden',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
       WebkitFontSmoothing: 'antialiased',
-      backgroundImage: 'radial-gradient(at 85% 15%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(at 10% 85%, rgba(37,99,235,0.06), transparent 60%)',
+      backgroundImage: 'radial-gradient(at 80% 10%, rgba(212,175,55,0.05), transparent 55%), radial-gradient(at 15% 90%, rgba(212,175,55,0.03), transparent 60%)',
     }}>
       <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
         <AppHeader
@@ -2061,6 +2074,8 @@ export default function App() {
               onToggleCurrency={toggleCurrency} onRefresh={refresh}
               loading={loading} stale={stale} lastUpdated={lastUpdated}
               onSelectHolding={setSelected}
+              onDeleteHolding={handleDelete}
+              onMoveHolding={handleMoveHolding}
               transactions={transactions}
             />
           )}
@@ -2090,7 +2105,7 @@ export default function App() {
 
         <TabBar activeTab={activeTab} onTabChange={setActiveTab} onAdd={handleFab} />
 
-        {selected && <HoldingDetail h={selected} onBack={() => setSelected(null)} />}
+        {selected && <HoldingDetail h={selected} onBack={() => setSelected(null)} onDelete={handleDelete} apiKey={apiKey} />}
 
         {adding && <AddHoldingSheet onClose={() => setAdding(false)} onAdd={handleAdd} />}
 
