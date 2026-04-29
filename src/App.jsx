@@ -781,7 +781,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, s
       )}
 
       {/* AI Insights */}
-      {geminiKey && (
+      {geminiKey && holdings.length > 0 && (
         <div className="mx-5 mt-4">
           <button onClick={handleGetInsights} disabled={insightsLoading}
             className="w-full flex items-center justify-center gap-2 h-10 rounded-2xl text-[11px] font-semibold disabled:opacity-60"
