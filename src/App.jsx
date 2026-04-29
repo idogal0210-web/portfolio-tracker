@@ -14,13 +14,22 @@ import {
 } from './utils'
 import { callGemini } from './gemini'
 import {
-  fetchPrices, supabaseConfigured,
+  fetchPrices, fetchHistory, supabaseConfigured,
   getSession, signInWithPassword, signUp, signOut, onAuthChange,
   fetchHoldings, upsertHolding, deleteHoldingBySymbol, bulkUpsertHoldings,
   fetchTransactions, upsertTransaction, deleteTransaction, bulkInsertTransactions,
   fetchBudgets, upsertBudget, deleteBudget, bulkUpsertBudgets,
   fetchRecurring, upsertRecurring, deleteRecurring, bulkUpsertRecurring,
 } from './api'
+
+// ─── currency helpers ─────────────────────────────────────────────────────────
+function formatCurrencyPrecise(value, currency) {
+  if (value == null || !isFinite(value)) return '—'
+  const abs = Math.abs(value)
+  const decimals = abs < 1 ? 4 : abs < 10 ? 3 : 2
+  const formatted = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+  return currency === 'ILS' ? `₪${formatted}` : `$${formatted}`
+}
 
 // ─── deterministic PRNG ───────────────────────────────────────────────────────
 function makeRand(seed) {
@@ -308,11 +317,11 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
   const dayColor = h.dayChange > 0 ? '#22c55e' : h.dayChange < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
 
   return (
-    <div className="absolute inset-0 bg-black text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}>
+    <div className="absolute inset-0 bg-[#050505] text-white overflow-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 48px)' }}>
       {/* Sticky nav */}
       <div className="sticky top-0 z-10 px-4 pb-3 flex items-center gap-3"
         style={{
-          background: 'linear-gradient(180deg,#000 60%,rgba(0,0,0,0))',
+          background: 'linear-gradient(180deg,#050505 60%,rgba(5,5,5,0))',
           paddingTop: 'calc(env(safe-area-inset-top) + 20px)',
         }}>
         <button onClick={onBack}
@@ -333,7 +342,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         <div className="mt-1">
           <div className="iq-label" style={{ color: '#52525b' }}>Current price</div>
           <div className="flex items-baseline gap-3 mt-1">
-            <div className="text-[40px] font-bold tracking-tight tabular-nums leading-none">
+            <div className="text-[40px] tabular-nums leading-none" style={{ fontWeight: 200, letterSpacing: '-0.03em' }}>
               {metrics ? formatCurrency(metrics.effectiveCurrentPrice, currency) : '—'}
             </div>
             <div className="text-[15px] font-semibold tabular-nums" style={{ color: dayColor }}>
@@ -349,7 +358,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         </div>
 
         {/* Range tabs */}
-        <div className="flex gap-1 mt-2 p-1 rounded-xl bg-white/4">
+        <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
           {ranges.map(r => (
             <button key={r} onClick={() => setRange(r)}
               className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
