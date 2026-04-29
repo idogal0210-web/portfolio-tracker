@@ -324,14 +324,14 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         <Logo ticker={h.ticker} size={28} />
         <div className="flex-1 min-w-0">
           <div className="text-[14px] font-bold tracking-tight">{displaySymbol(h.ticker)}</div>
-          <div className="text-[10px] text-white/45">{h.name}</div>
+          <div className="text-[10px]" style={{ color: '#71717a' }}>{h.name}</div>
         </div>
       </div>
 
       <div className="px-5">
         {/* Price */}
         <div className="mt-1">
-          <div className="text-[11px] font-semibold tracking-widest uppercase text-white/45">Current price</div>
+          <div className="iq-label" style={{ color: '#52525b' }}>Current price</div>
           <div className="flex items-baseline gap-3 mt-1">
             <div className="text-[40px] font-bold tracking-tight tabular-nums leading-none">
               {metrics ? formatCurrency(metrics.effectiveCurrentPrice, currency) : '—'}
@@ -362,7 +362,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         {/* Position card */}
         <div className="mt-5 p-4 rounded-[18px] bg-white/4 border border-white/5">
           <div className="flex justify-between items-baseline mb-3">
-            <span className="text-[12px] text-white/45">Market value</span>
+            <span className="text-[12px]" style={{ color: '#71717a' }}>Market value</span>
             <span className="text-[22px] font-bold tracking-tight tabular-nums">
               {metrics ? formatCurrency(metrics.currentValue, currency) : '—'}
             </span>
@@ -402,7 +402,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         {/* Transactions */}
         {h._holding.purchaseDate || h._holding.purchasePrice ? (
           <div className="mt-5">
-            <div className="text-[11px] font-semibold tracking-widest uppercase text-white/45 mb-2">Transactions</div>
+            <div className="iq-label mb-2" style={{ color: '#52525b' }}>Transactions</div>
             <div className="rounded-[18px] overflow-hidden bg-white/3 border border-white/5">
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 text-[10px] font-bold shrink-0">BUY</div>
@@ -436,7 +436,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
 function DetailStat({ label, value, color }) {
   return (
     <div>
-      <div className="text-[11px] text-white/45 font-medium mb-0.5">{label}</div>
+      <div className="text-[11px] font-medium mb-0.5" style={{ color: '#71717a' }}>{label}</div>
       <div className="text-[16px] font-semibold tabular-nums tracking-tight" style={{ color: color ?? '#fff' }}>{value}</div>
     </div>
   )
@@ -917,7 +917,7 @@ function PortfolioScreen({ holdings, enriched, prices, exchangeRate, currency, o
                     <Logo ticker={h.ticker} size={32} />
                     <div className="min-w-0">
                       <div className="text-[14px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
-                      <div className="text-[11px] text-white/40 truncate">{h.name}</div>
+                      <div className="text-[11px] truncate" style={{ color: '#71717a' }}>{h.name}</div>
                     </div>
                   </div>
                   <button onClick={() => {
@@ -1246,14 +1246,14 @@ function RecurringSheet({ templates, defaultCurrency, onClose, onSave, onDelete 
           <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-white/70 text-lg">×</button>
         </div>
         {templates.length === 0 && !adding && (
-          <p className="text-white/40 text-[13px] text-center py-6">No recurring transactions yet.</p>
+          <p className="text-[13px] text-center py-6" style={{ color: '#52525b' }}>No recurring transactions yet.</p>
         )}
         {templates.map(t => (
           <div key={t.id} className="flex items-center gap-3 py-2.5 border-b border-white/5">
             <CategoryIcon category={t.category} type={t.type} size={36} />
             <div className="flex-1 min-w-0">
               <div className="text-[14px] font-semibold">{t.category} · {formatCurrency(t.amount, t.currency)}</div>
-              <div className="text-[11px] text-white/45">{t.cadence} from {t.start_date}</div>
+              <div className="text-[11px]" style={{ color: '#71717a' }}>{t.cadence} from {t.start_date}</div>
             </div>
             <button onClick={() => onSave({ ...t, active: !t.active })}
               className={`text-[11px] font-bold px-2 py-1 rounded-lg ${t.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/5 text-white/30'}`}>
@@ -1490,7 +1490,7 @@ function ActivityScreen({
       {trend.some(t => t.net !== 0) && (
         <div className="mx-5 mt-2">
           <div className="glass-card-small p-4">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-white/40 mb-2">6-month net flow</div>
+            <div className="iq-label mb-2">6-month net flow</div>
             <MonthSparkline trend={trend} width={310} height={52} />
             <div className="flex justify-between mt-1">
               {trend.map(p => (
@@ -1513,7 +1513,7 @@ function ActivityScreen({
               ['Net', totals.net, netColor],
             ].map(([lbl, val, clr]) => (
               <div key={lbl} className={lbl !== 'Income' ? 'border-l border-white/5 pl-3' : ''}>
-                <div className={lbl === 'Net' ? 'iq-label mb-1' : 'text-[10px] font-semibold uppercase tracking-widest text-white/40 mb-1'}>{lbl}</div>
+                <div className="iq-label mb-1" style={lbl !== 'Net' ? { color: '#52525b' } : {}}>{lbl}</div>
                 <div className="text-[17px] font-bold tabular-nums tracking-tight" style={{ color: clr }}>
                   {lbl === 'Expenses' ? '−' : ''}{formatCurrency(Math.abs(val), currency)}
                 </div>
@@ -1530,7 +1530,8 @@ function ActivityScreen({
             <div className="flex gap-1 p-1 rounded-xl bg-white/5 mb-3">
               {['EXPENSE', 'INCOME'].map(t => (
                 <button key={t} onClick={() => setCatTab(t)}
-                  className={`flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors ${catTab === t ? 'bg-white/10 text-white' : 'text-white/40'}`}>
+                  className="flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors"
+                  style={catTab === t ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
                   {t === 'EXPENSE' ? 'Expenses' : 'Income'}
                 </button>
               ))}
@@ -1579,7 +1580,7 @@ function ActivityScreen({
         <div className="mx-5 mt-4 space-y-3">
           {grouped.map(g => (
             <div key={g.date}>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-white/40 mb-1.5 px-1">
+              <div className="iq-label mb-1.5 px-1" style={{ color: '#52525b' }}>
                 {formatDateLabel(g.date)}
               </div>
               <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
@@ -1594,9 +1595,9 @@ function ActivityScreen({
         </div>
       ) : (
         <div className="mx-5 mt-8 p-6 rounded-[22px] border border-white/5 bg-white/3 text-center">
-          <div className="text-[28px] mb-2">📊</div>
-          <div className="text-[14px] font-semibold text-white/60">No transactions this month</div>
-          <div className="text-[12px] text-white/35 mt-1">Tap + to add your first</div>
+          <div className="iq-label mb-2" style={{ color: '#52525b' }}>Activity</div>
+          <div className="text-[14px] font-light text-white/60">No transactions this month</div>
+          <div className="text-[12px] mt-1" style={{ color: '#52525b' }}>Tap + to add your first</div>
         </div>
       )}
     </div>
@@ -1764,15 +1765,27 @@ function AuthSheet({ onClose, onSignedIn }) {
 // ─── MarketsScreen (placeholder) ─────────────────────────────────────────────
 function MarketsScreen() {
   return (
-    <div className="flex items-center justify-center" style={{
+    <div className="flex flex-col items-center justify-center" style={{
       height: '100%',
       paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
     }}>
       <div className="text-center px-8">
-        <div className="text-[36px] mb-3">📉</div>
-        <div className="text-[16px] font-bold text-white/70">Markets coming soon</div>
-        <div className="text-[13px] text-white/40 mt-1">Real-time market data will appear here</div>
+        <div className="mb-5 flex items-center justify-center">
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            border: '1px solid rgba(212,175,55,0.3)',
+            background: 'rgba(212,175,55,0.06)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M3 17l4-4 4 4 7-7 3 3" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+        <div className="iq-label mb-3">Markets</div>
+        <div className="text-[16px] font-light text-white/70">Coming soon</div>
+        <div className="text-[12px] mt-2" style={{ color: '#52525b' }}>Live market data will appear here</div>
       </div>
     </div>
   )
