@@ -11,6 +11,7 @@ import {
   loadBudgets, saveBudgets,
   loadRecurring, saveRecurring,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
+  loadDisplayName, saveDisplayName,
 } from './utils'
 import { callGemini } from './gemini'
 import {
@@ -93,6 +94,19 @@ const SECTOR_MAP = {
 const SECTOR_COLORS = {
   Tech:'#6366f1', Finance:'#22c55e', Energy:'#f59e0b', Healthcare:'#ec4899',
   Consumer:'#06b6d4', Index:'#8b5cf6', Crypto:'#f97316', IL:'#3b82f6', Other:'rgba(255,255,255,0.25)',
+}
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 768
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const handler = e => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isDesktop
 }
 
 function generateLogo(ticker) {
@@ -635,7 +649,7 @@ function TabIcon({ type, active }) {
   return null
 }
 
-function TabBar({ activeTab, onTabChange, onAdd }) {
+function TabBar({ activeTab, onTabChange }) {
   const tabIcon = (key, active) => <TabIcon type={key} active={active} />
   return (
     <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-2"
@@ -650,15 +664,6 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
         active={activeTab === 'networth'} onClick={() => onTabChange('networth')} />
       <TabBtn icon={tabIcon('cashflow', activeTab === 'cashflow')} label="Cashflow"
         active={activeTab === 'cashflow'} onClick={() => onTabChange('cashflow')} />
-      <div className="flex-1 flex justify-center">
-        <button onClick={onAdd}
-          className="pressable w-[44px] h-[44px] rounded-full flex items-center justify-center -translate-y-1"
-          style={{ background: '#86efac', boxShadow: '0 6px 20px rgba(134,239,172,0.35)' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
       <TabBtn icon={tabIcon('holdings', activeTab === 'holdings')} label="Holdings"
         active={activeTab === 'holdings'} onClick={() => onTabChange('holdings')} />
       <TabBtn icon={tabIcon('settings', activeTab === 'settings')} label="Settings"
@@ -694,25 +699,35 @@ function TabBtn({ icon, label, active, onClick }) {
   )
 }
 
+// ─── FloatingActionButton ─────────────────────────────────────────────────────
+function FloatingActionButton({ onClick }) {
+  return (
+    <button onClick={onClick}
+      className="pressable absolute z-20 w-[52px] h-[52px] rounded-full flex items-center justify-center"
+      style={{
+        right: '20px',
+        bottom: 'calc(env(safe-area-inset-bottom) + 72px)',
+        background: '#86efac',
+        boxShadow: '0 6px 24px rgba(134,239,172,0.45)',
+      }}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+    </button>
+  )
+}
+
 // ─── NetWorthScreen ───────────────────────────────────────────────────────────
-function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, stale, transactions }) {
+function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, stale, transactions, displayName }) {
   const { totalUSD, totalILS } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
 
   const now = new Date()
-  const [viewYear, setViewYear] = useState(now.getFullYear())
-  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1)
-  function prevMonth() {
-    if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1) }
-    else setViewMonth(m => m - 1)
-  }
-  function nextMonth() {
-    if (viewMonth === 12) { setViewMonth(1); setViewYear(y => y + 1) }
-    else setViewMonth(m => m + 1)
-  }
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
   const periodTotals = useMemo(
-    () => calculateMonthlyTotals(transactions, viewYear, viewMonth, currency, exchangeRate),
-    [transactions, viewYear, viewMonth, currency, exchangeRate],
+    () => calculateMonthlyTotals(transactions, currentYear, currentMonth, currency, exchangeRate),
+    [transactions, currentYear, currentMonth, currency, exchangeRate],
   )
 
   // Cash balance = cumulative income − expenses from all transactions
@@ -725,12 +740,6 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
 
   const portfolioValue = currency === 'ILS' ? totalILS : totalUSD
   const netWorth = cashBalance + portfolioValue
-  const isCashUp = cashBalance >= 0
-  const isNetWorthUp = netWorth >= 0
-
-  const savingsRate = periodTotals.income > 0
-    ? ((periodTotals.income - Math.abs(periodTotals.expenses)) / periodTotals.income * 100)
-    : null
 
   const geminiKey = import.meta.env.VITE_GEMINI_KEY
   const [insights, setInsights] = useState('')
@@ -768,39 +777,121 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
-      paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
-      paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom) + 90px)',
+      paddingTop: 'calc(env(safe-area-inset-top) + 64px)',
     }}>
-      {/* Period navigation */}
-      <div className="flex items-center justify-between px-5 pt-3 pb-1">
-        <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
-          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-        <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#86efac' }}>
-          {MONTH_NAMES[viewMonth - 1]} {viewYear}
-        </span>
-        <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
-          <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-      </div>
 
+      {/* Stale warning */}
       {stale && (
-        <div className="mx-5 mt-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
+        <div className="mx-5 mb-3 text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-2xl px-4 py-2">
           ⚠ Could not fetch live prices — showing cached data.
         </div>
       )}
 
-      {/* AI Insights */}
-      {geminiKey && (holdings.length > 0 || transactions.length > 0) && (
-        <div className="mx-5 mt-4">
-          <button onClick={handleGetInsights} disabled={insightsLoading}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-2xl text-[11px] font-semibold disabled:opacity-60"
-            style={{ border: '1px solid rgba(134,239,172,0.4)', color: '#86efac', background: 'rgba(134,239,172,0.06)' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={insightsLoading ? 'animate-spin' : ''}>
-              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" stroke="#86efac" strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z" stroke="#86efac" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* ── Hero ─────────────────────────────────────────── */}
+      <div className="text-center px-5 pt-2 pb-5">
+        <div className="iq-label mb-2">Total Net Worth</div>
+        <div className="flex items-baseline justify-center gap-2">
+          <span className="tabular-nums leading-none"
+            style={{ fontWeight: 200, letterSpacing: '-0.03em', fontSize: 'clamp(40px, 10vw, 64px)' }}>
+            {formatCurrency(netWorth, currency).replace(/^[₪$]/, '')}
+          </span>
+          <span className="text-[18px] font-light" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            {currency}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Inflow / Outflow row ──────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 mx-5 mb-4">
+        <div className="glass-card-small p-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M7 17L17 7M17 7H7M17 7v10" stroke="#22c55e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {insightsLoading ? 'Analyzing…' : 'Get AI Insights'}
+            <span className="iq-label" style={{ color: '#22c55e' }}>Inflow</span>
+          </div>
+          <div className="text-[22px] font-semibold tabular-nums tracking-tight text-white">
+            {formatCurrency(periodTotals.income, currency)}
+          </div>
+        </div>
+        <div className="glass-card-small p-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M17 7L7 17M7 17h10M7 17V7" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="iq-label" style={{ color: '#ef4444' }}>Outflow</span>
+          </div>
+          <div className="text-[22px] font-semibold tabular-nums tracking-tight text-white">
+            {formatCurrency(Math.abs(periodTotals.expenses), currency)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Private Insights header ───────────────────────── */}
+      <div className="mx-5 mb-3">
+        <span className="iq-label">Hi {(displayName || 'You').toUpperCase()}, Private Insights</span>
+      </div>
+
+      {/* ── Insight cards (1-col mobile, 2-col desktop) ───── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mx-5 mb-4">
+        {/* Portfolio Returns */}
+        <div className="glass-card-small p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(134,239,172,0.1)', border: '1px solid rgba(134,239,172,0.2)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <polyline points="3,17 7,11 11,14 17,7 21,10" stroke="#86efac" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="iq-label mb-0.5">Portfolio Returns</div>
+            <div className="text-[15px] font-bold tabular-nums"
+              style={{ color: allTimePct >= 0 ? '#86efac' : '#ef4444' }}>
+              {allTimePct >= 0 ? '+' : ''}{allTimePct.toFixed(2)}%{' '}
+              <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>ALL-TIME</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Monthly Net Flow */}
+        <div className="glass-card-small p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="#6366f1" strokeWidth="1.8" />
+              <path d="M12 7v5l3 3" stroke="#6366f1" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="iq-label mb-0.5">Monthly Net Flow</div>
+            <div className="text-[12px] font-semibold leading-snug"
+              style={{ color: periodTotals.net >= 0 ? '#86efac' : '#f43f5e' }}>
+              {periodTotals.net >= 0 ? 'SAVED ' : 'SPENT '}
+              {formatCurrency(Math.abs(periodTotals.net), currency)}
+              {' '}<span style={{ color: 'rgba(255,255,255,0.4)' }}>THIS MONTH</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── AI Insights CTA ──────────────────────────────── */}
+      {geminiKey && (holdings.length > 0 || transactions.length > 0) && (
+        <div className="mx-5 mb-4">
+          <button onClick={handleGetInsights} disabled={insightsLoading}
+            className="pressable w-full flex items-center gap-3 px-4 py-4 rounded-[20px] disabled:opacity-60"
+            style={{
+              background: 'linear-gradient(135deg, rgba(134,239,172,0.12) 0%, rgba(101,163,13,0.08) 100%)',
+              border: '1px solid rgba(134,239,172,0.25)',
+            }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className={insightsLoading ? 'animate-spin' : ''}>
+              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"
+                stroke="#86efac" strokeWidth="1.5" strokeLinejoin="round" fill="rgba(134,239,172,0.15)" />
+              <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"
+                stroke="#86efac" strokeWidth="1.3" strokeLinejoin="round" />
+            </svg>
+            <span className="text-[14px] font-semibold" style={{ color: '#86efac' }}>
+              {insightsLoading ? 'Analyzing…' : 'Get AI Insights'}
+            </span>
           </button>
           {insightsOpen && (
             <div className="mt-2 glass-panel rounded-2xl px-4 py-3">
@@ -819,123 +910,6 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Hero — Cash Balance + Net Worth breakdown */}
-      <div className="mx-5 mt-4">
-        <div className="glass-card p-5 relative overflow-hidden">
-          <div className="iq-label mb-2">Cash Balance</div>
-          <div className="text-center mb-4">
-            <div className="text-[52px] tabular-nums leading-none"
-              style={{ fontWeight: 200, letterSpacing: '-0.03em', color: isCashUp ? 'white' : '#ef4444' }}>
-              {transactions.length ? formatCurrency(cashBalance, currency) : (currency === 'ILS' ? '₪0' : '$0')}
-            </div>
-            <div className="mt-2 text-[12px]" style={{ color: '#71717a' }}>
-              {transactions.length ? 'Running total · all time' : 'Add transactions to track your balance'}
-            </div>
-          </div>
-          {/* Breakdown rows */}
-          <div className="border-t pt-3 space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#86efac' }} />
-                <span className="text-[12px] text-white/55">Cash (bank)</span>
-              </div>
-              <span className="text-[13px] font-semibold tabular-nums" style={{ color: isCashUp ? '#86efac' : '#ef4444' }}>
-                {formatCurrency(cashBalance, currency)}
-              </span>
-            </div>
-            {holdings.length > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#6366f1' }} />
-                  <span className="text-[12px] text-white/55">Investments</span>
-                </div>
-                <span className="text-[13px] font-semibold tabular-nums text-white/75">
-                  {formatCurrency(portfolioValue, currency)}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="text-[12px] font-bold text-white/85">Net Worth</span>
-              <span className="text-[15px] font-bold tabular-nums" style={{ color: isNetWorthUp ? '#86efac' : '#ef4444' }}>
-                {formatCurrency(netWorth, currency)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Monthly Summary */}
-      {transactions.length > 0 && (
-        <div className="mx-5 mt-3">
-          <div className="glass-card-small p-4">
-            <div className="iq-label mb-3">{MONTH_NAMES[viewMonth - 1]} Summary</div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <div className="text-[11px] text-white/40 mb-0.5">Income</div>
-                <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#22c55e' }}>
-                  {formatCurrency(periodTotals.income, currency)}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] text-white/40 mb-0.5">Expenses</div>
-                <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#f43f5e' }}>
-                  {formatCurrency(Math.abs(periodTotals.expenses), currency)}
-                </div>
-              </div>
-            </div>
-            <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-white/50">Net this month</span>
-                <span className="text-[13px] font-bold tabular-nums"
-                  style={{ color: periodTotals.net >= 0 ? '#22c55e' : '#ef4444' }}>
-                  {periodTotals.net >= 0 ? '+' : ''}{formatCurrency(periodTotals.net, currency)}
-                </span>
-              </div>
-              {savingsRate !== null && (
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-white/50">Savings rate</span>
-                  <span className="text-[12px] font-semibold tabular-nums"
-                    style={{ color: savingsRate >= 20 ? '#22c55e' : savingsRate >= 10 ? '#f59e0b' : '#ef4444' }}>
-                    {savingsRate.toFixed(0)}%
-                  </span>
-                </div>
-              )}
-              {periodTotals.count === 0 && (
-                <div className="text-center text-[12px] py-1" style={{ color: '#52525b' }}>No transactions this month</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Investment quick stats */}
-      {holdings.length > 0 && (
-        <div className="mx-5 mt-3 mb-2">
-          <div className="glass-card-small p-4">
-            <div className="iq-label mb-3">Investments</div>
-            <div className="grid grid-cols-3 gap-0 divide-x divide-white/5">
-              <div className="pr-3">
-                <div className="text-[11px] text-white/40 mb-0.5">Holdings</div>
-                <div className="text-[20px] font-bold tracking-tight">{holdings.length}</div>
-              </div>
-              <div className="px-3">
-                <div className="text-[11px] text-white/40 mb-0.5">Value</div>
-                <div className="text-[13px] font-bold tracking-tight tabular-nums leading-tight mt-0.5">
-                  {formatCurrency(portfolioValue, currency)}
-                </div>
-              </div>
-              <div className="pl-3">
-                <div className="text-[11px] text-white/40 mb-0.5">All-time</div>
-                <div className="text-[20px] font-bold tracking-tight tabular-nums"
-                  style={{ color: allTimePct >= 0 ? '#22c55e' : '#ef4444' }}>
-                  {allTimePct >= 0 ? '+' : ''}{allTimePct.toFixed(1)}%
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
@@ -1644,10 +1618,12 @@ function SettingsScreen({
   cloudAvailable, session, syncing,
   onSignIn, onSignOut,
   holdingsCount, transactionsCount,
+  displayName, onSaveDisplayName,
 }) {
   const email = session?.user?.email
-  const displayName = email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'You'
-  const initial = displayName[0]?.toUpperCase() || 'U'
+  const emailDisplayName = email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'You'
+  const profileLabel = displayName || emailDisplayName
+  const initial = profileLabel[0]?.toUpperCase() || 'U'
   const [notificationsOn, setNotificationsOn] = useState(() => localStorage.getItem('iq_notifications') !== 'false')
 
   function toggleNotifications() {
@@ -1672,13 +1648,27 @@ function SettingsScreen({
               {initial}
             </div>
             <div>
-              <div className="text-[20px] font-semibold tracking-tight">{displayName}</div>
+              <div className="text-[20px] font-semibold tracking-tight">{profileLabel}</div>
               <div className="flex items-center gap-1.5 mt-1">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#86efac' }} />
                 <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#86efac' }}>Premium Member</span>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Display Name */}
+        <div className="glass-card-small p-4">
+          <div className="iq-label mb-3">Profile</div>
+          <div className="text-[12px] text-white/50 mb-1.5">First Name (shown in greeting)</div>
+          <input
+            type="text"
+            value={displayName || ''}
+            onChange={e => onSaveDisplayName(e.target.value)}
+            placeholder="Your first name"
+            maxLength={32}
+            className="glass-input w-full rounded-xl px-3 py-2 text-[14px] text-white outline-none"
+          />
         </div>
 
         {/* Preferences */}
@@ -2279,6 +2269,11 @@ export default function App() {
   // ── UI state ───────────────────────────────────────────────────────────────
   const [currency, setCurrency] = useState('USD')
   const [activeTab, setActiveTab] = useState('networth')
+  const [displayName, setDisplayName] = useState(() => loadDisplayName())
+  function handleSaveDisplayName(name) {
+    setDisplayName(name)
+    saveDisplayName(name)
+  }
   const [selected, setSelected] = useState(null)
   const [adding, setAdding] = useState(false)
   const [addingTxn, setAddingTxn] = useState(false)
@@ -2521,7 +2516,7 @@ export default function App() {
       WebkitFontSmoothing: 'antialiased',
       backgroundImage: 'radial-gradient(at 80% 10%, rgba(134,239,172,0.05), transparent 55%), radial-gradient(at 15% 90%, rgba(134,239,172,0.03), transparent 60%)',
     }}>
-      <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
+      <div className="max-w-[430px] md:max-w-4xl mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
         <AppHeader
           currency={currency}
           onToggleCurrency={toggleCurrency}
@@ -2535,6 +2530,7 @@ export default function App() {
               exchangeRate={exchangeRate} currency={currency}
               stale={stale}
               transactions={transactions}
+              displayName={displayName}
             />
           )}
           {activeTab === 'cashflow' && (
@@ -2567,11 +2563,14 @@ export default function App() {
               onSignOut={handleSignOut}
               holdingsCount={holdings.length}
               transactionsCount={transactions.length}
+              displayName={displayName}
+              onSaveDisplayName={handleSaveDisplayName}
             />
           )}
         </div>
 
-        <TabBar activeTab={activeTab} onTabChange={setActiveTab} onAdd={handleFab} />
+        <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <FloatingActionButton onClick={handleFab} />
 
         {selected && <HoldingDetail h={selected} onBack={() => setSelected(null)} onDelete={handleDelete} apiKey={apiKey} />}
 

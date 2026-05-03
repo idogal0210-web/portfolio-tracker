@@ -437,3 +437,11 @@ export const summarizeMonth = (transactions, ref = new Date()) => {
   }
   return { income, expense, net: income - expense }
 }
+
+export function loadDisplayName() {
+  try { return localStorage.getItem('portfolio_display_name') || '' } catch { return '' }
+}
+
+export function saveDisplayName(name) {
+  try { localStorage.setItem('portfolio_display_name', name) } catch {}
+}
