@@ -240,7 +240,7 @@ function MarketBadge({ market }) {
 function AllocationBar({ slices }) {
   const total = slices.reduce((s, x) => s + x.value, 0) || 1
   return (
-    <div className="flex w-full h-2 rounded-full overflow-hidden bg-white/5">
+    <div className="flex w-full h-2 rounded-full overflow-hidden bg-white/5 bar-enter">
       {slices.map((s, i) => (
         <div key={i} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} />
       ))}
@@ -261,8 +261,8 @@ function HoldingRow({ h, onClick }) {
 
   return (
     <div onClick={onClick}
-      className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-white/3 active:bg-white/5">
-      <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', display: 'inline-flex' }}>
+      className="pressable flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.03]">
+      <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(134,239,172,0.3)', display: 'inline-flex' }}>
         <Logo ticker={h.ticker} size={36} />
       </div>
       <div className="flex-1 min-w-0">
@@ -326,7 +326,7 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
           paddingTop: 'calc(env(safe-area-inset-top) + 20px)',
         }}>
         <button onClick={onBack}
-          className="w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center shrink-0">
+          className="pressable w-9 h-9 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center shrink-0">
           <svg width="10" height="18" viewBox="0 0 10 18" fill="none">
             <path d="M8 2L2 9l6 7" stroke="rgba(255,255,255,0.7)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -362,8 +362,8 @@ function HoldingDetail({ h, onBack, onDelete, apiKey }) {
         <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
           {ranges.map(r => (
             <button key={r} onClick={() => setRange(r)}
-              className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
-              style={range === r ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.4)' }}>
+              className="pressable flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200"
+              style={range === r ? { background: 'rgba(134,239,172,0.15)', color: '#86efac' } : { color: 'rgba(255,255,255,0.4)' }}>
               {r}
             </button>
           ))}
@@ -500,7 +500,7 @@ function AddHoldingSheet({ onClose, onAdd }) {
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5"
+      <div className="relative text-white rounded-t-[28px] p-5 sheet-enter"
         style={{
           background: '#0A0A0A',
           boxShadow: '0 -20px 40px rgba(0,0,0,0.6)',
@@ -561,8 +561,8 @@ function AddHoldingSheet({ onClose, onAdd }) {
         </div>
 
         <button onClick={handleSubmit}
-          className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
-          style={{ background: '#D4AF37', boxShadow: '0 10px 30px rgba(212,175,55,0.25)' }}>
+          className="pressable w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
+          style={{ background: '#86efac', boxShadow: '0 10px 30px rgba(134,239,172,0.25)' }}>
           Save investment
         </button>
       </div>
@@ -592,10 +592,9 @@ function AppHeader({ currency, onToggleCurrency, onRefresh, loading }) {
         borderBottom: '1px solid rgba(255,255,255,0.03)',
       }}>
       <div className="flex items-center gap-2.5">
-        <div style={{
+        <div className="accent-glow" style={{
           width: 7, height: 7, borderRadius: '50%',
-          background: '#D4AF37',
-          boxShadow: '0 0 10px rgba(212,175,55,0.7)',
+          background: '#86efac',
         }} />
         <span style={{
           fontWeight: 300,
@@ -607,12 +606,12 @@ function AppHeader({ currency, onToggleCurrency, onRefresh, loading }) {
       </div>
       <div className="flex items-center gap-2">
         <button onClick={onToggleCurrency}
-          className="h-7 px-3 rounded-full text-[10px] font-semibold"
-          style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+          className="pressable h-7 px-3 rounded-full text-[10px] font-semibold"
+          style={{ border: '1px solid rgba(134,239,172,0.4)', color: '#86efac', background: 'rgba(134,239,172,0.06)' }}>
           {currency}
         </button>
         <button onClick={onRefresh} disabled={loading}
-          className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-40"
+          className="pressable w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-40"
           style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={loading ? 'animate-spin' : ''}>
             <path d="M21 12a9 9 0 11-3.5-7.1M21 3v6h-6" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -624,19 +623,45 @@ function AppHeader({ currency, onToggleCurrency, onRefresh, loading }) {
 }
 
 // ─── TabBar ───────────────────────────────────────────────────────────────────
-const TAB_PATHS = {
-  networth:  'M3 13l9-9 9 9M5 11v10h14V11',
-  cashflow:  'M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18',
-  holdings:  'M3 6h18M3 12h18M3 18h12',
-  settings:  'M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8c0-4 4-6 8-6s8 2 8 6',
+function TabIcon({ type, active }) {
+  const s = active ? '#86efac' : '#52525b'
+  const p = { strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round' }
+  const st = { style: { transition: 'stroke 0.22s ease' } }
+  if (type === 'networth') return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <polyline points="3,17 7,11 11,14 17,7 21,10" stroke={s} {...p} {...st} />
+      <line x1="3" y1="3" x2="3" y2="21" stroke={s} {...p} {...st} />
+      <line x1="3" y1="21" x2="22" y2="21" stroke={s} {...p} {...st} />
+    </svg>
+  )
+  if (type === 'cashflow') return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke={s} {...p} {...st} />
+      <line x1="12" y1="7" x2="12" y2="8.5" stroke={s} {...p} {...st} />
+      <line x1="12" y1="15.5" x2="12" y2="17" stroke={s} {...p} {...st} />
+      <path d="M9.5 10a2.5 1.8 0 015 0c0 1.8-5 1.8-5 3.6a2.5 1.8 0 005 0" stroke={s} {...p} {...st} />
+    </svg>
+  )
+  if (type === 'holdings') return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="3" width="20" height="18" rx="2.5" stroke={s} {...p} {...st} />
+      <circle cx="7" cy="9" r="1.3" fill={s} style={{ transition: 'fill 0.22s ease' }} />
+      <circle cx="7" cy="14" r="1.3" fill={s} style={{ transition: 'fill 0.22s ease' }} />
+      <line x1="11" y1="9" x2="18" y2="9" stroke={s} {...p} {...st} />
+      <line x1="11" y1="14" x2="16" y2="14" stroke={s} {...p} {...st} />
+    </svg>
+  )
+  if (type === 'settings') return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8.5" r="3.5" stroke={s} {...p} {...st} />
+      <path d="M4 21c0-3.5 3.6-6 8-6s8 2.5 8 6" stroke={s} {...p} {...st} />
+    </svg>
+  )
+  return null
 }
 
 function TabBar({ activeTab, onTabChange, onAdd }) {
-  const tabIcon = (key, active) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d={TAB_PATHS[key]} stroke={active ? '#D4AF37' : '#52525b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
+  const tabIcon = (key, active) => <TabIcon type={key} active={active} />
   return (
     <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center px-5 pt-2"
       style={{
@@ -652,8 +677,8 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
         active={activeTab === 'cashflow'} onClick={() => onTabChange('cashflow')} />
       <div className="flex-1 flex justify-center">
         <button onClick={onAdd}
-          className="w-[44px] h-[44px] rounded-full flex items-center justify-center -translate-y-1"
-          style={{ background: '#D4AF37', boxShadow: '0 6px 20px rgba(212,175,55,0.35)' }}>
+          className="pressable w-[44px] h-[44px] rounded-full flex items-center justify-center -translate-y-1"
+          style={{ background: '#86efac', boxShadow: '0 6px 20px rgba(134,239,172,0.35)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M12 5v14M5 12h14" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
@@ -670,26 +695,34 @@ function TabBar({ activeTab, onTabChange, onAdd }) {
 function TabBtn({ icon, label, active, onClick }) {
   return (
     <button onClick={onClick}
-      className="flex-1 flex flex-col items-center gap-0.5 bg-transparent border-0 p-0 py-1">
+      className="pressable flex-1 flex flex-col items-center gap-0.5 bg-transparent border-0 p-0 py-1 relative">
+      {active && (
+        <div style={{
+          position: 'absolute', top: 0, left: '50%',
+          width: 20, height: 2, borderRadius: 9999,
+          background: '#86efac',
+          boxShadow: '0 0 8px rgba(134,239,172,0.7)',
+          animation: 'tabDotIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both',
+          transformOrigin: 'center',
+        }} />
+      )}
       {icon}
       <span style={{
         fontSize: 7,
         letterSpacing: '0.2em',
         textTransform: 'uppercase',
         fontWeight: 600,
-        color: active ? '#D4AF37' : '#52525b',
+        color: active ? '#86efac' : '#52525b',
+        transition: 'color 0.22s ease',
       }}>{label}</span>
     </button>
   )
 }
 
-// ─── NetWorthScreen (was PortfolioScreen) ────────────────────────────────────
+// ─── NetWorthScreen ───────────────────────────────────────────────────────────
 function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, stale, transactions }) {
-  const { totalUSD, totalILS, usPct, ilPct, cryptoPct, gainUSD } = calculateTotals(holdings, prices, exchangeRate)
+  const { totalUSD, totalILS } = calculateTotals(holdings, prices, exchangeRate)
   const { pct: allTimePct } = calculateAllTimeReturn(holdings, prices, exchangeRate)
-  const [range, setRange] = useState('1M')
-  const [allocTab, setAllocTab] = useState('geo')
-  const ranges = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
 
   const now = new Date()
   const [viewYear, setViewYear] = useState(now.getFullYear())
@@ -707,6 +740,23 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
     [transactions, viewYear, viewMonth, currency, exchangeRate],
   )
 
+  // Cash balance = cumulative income − expenses from all transactions
+  const cashBalance = useMemo(() => {
+    return (transactions || []).reduce((sum, t) => {
+      const amount = convertAmount(t.amount, t.currency, currency, exchangeRate)
+      return t.type === 'INCOME' ? sum + amount : sum - amount
+    }, 0)
+  }, [transactions, currency, exchangeRate])
+
+  const portfolioValue = currency === 'ILS' ? totalILS : totalUSD
+  const netWorth = cashBalance + portfolioValue
+  const isCashUp = cashBalance >= 0
+  const isNetWorthUp = netWorth >= 0
+
+  const savingsRate = periodTotals.income > 0
+    ? ((periodTotals.income - Math.abs(periodTotals.expenses)) / periodTotals.income * 100)
+    : null
+
   const geminiKey = import.meta.env.VITE_GEMINI_KEY
   const [insights, setInsights] = useState('')
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -719,16 +769,15 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
     setInsightsOpen(true)
     try {
       const portfolioSummary = enriched.map(h =>
-        `${displaySymbol(h.ticker)} (${h.market}): ${h.qty} shares @ ${formatCurrency(h._metrics?.effectiveCurrentPrice ?? 0, h.market === 'IL' ? 'ILS' : 'USD')}, value ${formatCurrency(h._metrics?.currentValue ?? 0, h.market === 'IL' ? 'ILS' : 'USD')}, ROI ${h._metrics?.roiPct?.toFixed(1) ?? 0}%`
+        `${displaySymbol(h.ticker)} (${h.market}): ${h.qty} shares, value ${formatCurrency(h._metrics?.currentValue ?? 0, h.market === 'IL' ? 'ILS' : 'USD')}, ROI ${h._metrics?.roiPct?.toFixed(1) ?? 0}%`
       ).join('\n')
       const recentTxns = (transactions || []).slice(-20).map(t =>
         `${t.date} ${t.type} ${t.category} ${formatCurrency(t.amount, t.currency)}${t.note ? ' — ' + t.note : ''}`
       ).join('\n')
-      const totalVal = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
       const payload = {
         contents: [{
           parts: [{
-            text: `You are a concise personal finance advisor. Analyze this portfolio and provide 3–5 bullet-point insights covering diversification, performance, risk, and one actionable recommendation. Be brief.\n\nTotal net worth: ${totalVal}\nAll-time return: ${allTimePct.toFixed(2)}%\n\nHoldings:\n${portfolioSummary || 'None'}\n\nRecent transactions (last 20):\n${recentTxns || 'None'}`,
+            text: `You are a concise personal finance advisor. Analyze this cash flow and portfolio data and provide 3–5 bullet-point insights. Be brief.\n\nCash balance: ${formatCurrency(cashBalance, currency)}\nInvestments: ${formatCurrency(portfolioValue, currency)}\nTotal net worth: ${formatCurrency(netWorth, currency)}\n\nHoldings:\n${portfolioSummary || 'None'}\n\nRecent transactions (last 20):\n${recentTxns || 'None'}`,
           }],
         }],
       }
@@ -741,43 +790,6 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
     }
   }
 
-  const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
-  const isGainUp = gainUSD >= 0
-  const gainColor = isGainUp ? '#22c55e' : '#ef4444'
-  const isAllTimeUp = allTimePct >= 0
-
-  const chartData = useMemo(() => buildPortfolioReturnCurve(enriched, exchangeRate), [enriched, exchangeRate])
-  const chartColor = isGainUp ? '#22c55e' : '#ef4444'
-
-
-  const geoSlices = [
-    { label: 'Crypto', value: cryptoPct, color: '#f59e0b' },
-    { label: 'US',     value: usPct,     color: '#22c55e' },
-    { label: 'IL',     value: ilPct,     color: '#6366f1' },
-  ].filter(s => s.value > 0)
-
-  const assetSlices = [
-    { label: 'Equities', value: usPct + ilPct, color: '#22c55e' },
-    { label: 'Crypto',   value: cryptoPct,     color: '#f59e0b' },
-  ].filter(s => s.value > 0)
-
-  const sectorValues = useMemo(() => {
-    const totals = {}
-    for (const h of enriched) {
-      if (!h._metrics) continue
-      const baseSymbol = displaySymbol(h.ticker).replace('.TA', '')
-      const sector = h.market === 'CRYPTO' ? 'Crypto' : h.market === 'IL' ? 'IL' : (SECTOR_MAP[baseSymbol] ?? 'Other')
-      const val = h.market === 'IL' ? h._metrics.currentValue / exchangeRate : h._metrics.currentValue
-      totals[sector] = (totals[sector] ?? 0) + val
-    }
-    const grand = Object.values(totals).reduce((a, b) => a + b, 0) || 1
-    return Object.entries(totals)
-      .map(([label, val]) => ({ label, value: (val / grand) * 100, color: SECTOR_COLORS[label] ?? SECTOR_COLORS.Other }))
-      .sort((a, b) => b.value - a.value)
-  }, [enriched, exchangeRate])
-
-  const allocationSlices = allocTab === 'asset' ? assetSlices : allocTab === 'sector' ? sectorValues : geoSlices
-
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
       height: '100%',
@@ -789,7 +801,7 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
         <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
           <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-        <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#D4AF37' }}>
+        <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#86efac' }}>
           {MONTH_NAMES[viewMonth - 1]} {viewYear}
         </span>
         <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
@@ -804,14 +816,14 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
       )}
 
       {/* AI Insights */}
-      {geminiKey && holdings.length > 0 && (
+      {geminiKey && (holdings.length > 0 || transactions.length > 0) && (
         <div className="mx-5 mt-4">
           <button onClick={handleGetInsights} disabled={insightsLoading}
             className="w-full flex items-center justify-center gap-2 h-10 rounded-2xl text-[11px] font-semibold disabled:opacity-60"
-            style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+            style={{ border: '1px solid rgba(134,239,172,0.4)', color: '#86efac', background: 'rgba(134,239,172,0.06)' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={insightsLoading ? 'animate-spin' : ''}>
-              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" stroke="#D4AF37" strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z" stroke="#D4AF37" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" stroke="#86efac" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z" stroke="#86efac" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
             {insightsLoading ? 'Analyzing…' : 'Get AI Insights'}
           </button>
@@ -835,99 +847,118 @@ function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, st
         </div>
       )}
 
-      {/* Hero card */}
+      {/* Hero — Cash Balance + Net Worth breakdown */}
       <div className="mx-5 mt-4">
         <div className="glass-card p-5 relative overflow-hidden">
-          <div className="iq-label mb-2">Total net worth</div>
-          <div className="text-center mb-1">
-            <div className="text-[48px] tabular-nums leading-none" style={{ fontWeight: 200, letterSpacing: '-0.03em' }}>
-              {holdings.length ? totalDisplay : (currency === 'ILS' ? '₪0' : '$0')}
+          <div className="iq-label mb-2">Cash Balance</div>
+          <div className="text-center mb-4">
+            <div className="text-[52px] tabular-nums leading-none"
+              style={{ fontWeight: 200, letterSpacing: '-0.03em', color: isCashUp ? 'white' : '#ef4444' }}>
+              {transactions.length ? formatCurrency(cashBalance, currency) : (currency === 'ILS' ? '₪0' : '$0')}
+            </div>
+            <div className="mt-2 text-[12px]" style={{ color: '#71717a' }}>
+              {transactions.length ? 'Running total · all time' : 'Add transactions to track your balance'}
             </div>
           </div>
-          <div className="flex items-center justify-center gap-2 flex-wrap mb-4 mt-2">
-            {holdings.length > 0 && (
-              <>
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5"
-                  style={{ color: gainColor, background: `${gainColor}1f` }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d={isGainUp ? 'M1 8l3-3 2 2 5-5M8 2h3v3' : 'M1 4l3 3 2-2 5 5M8 10h3V7'}
-                      stroke={gainColor} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-                  </svg>
-                  {isGainUp ? '+' : ''}{formatCurrency(gainUSD, 'USD')} today
-                </span>
-                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-white/6 tabular-nums"
-                  style={{ color: isAllTimeUp ? '#22c55e' : '#ef4444' }}>
-                  {isAllTimeUp ? '+' : ''}{allTimePct.toFixed(2)}% all time
-                </span>
-              </>
-            )}
-            {!holdings.length && (
-              <span className="text-[11px] px-3 py-1 rounded-full bg-white/5 text-white/30 border border-white/10">
-                No holdings yet
+          {/* Breakdown rows */}
+          <div className="border-t pt-3 space-y-2.5" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#86efac' }} />
+                <span className="text-[12px] text-white/55">Cash (bank)</span>
+              </div>
+              <span className="text-[13px] font-semibold tabular-nums" style={{ color: isCashUp ? '#86efac' : '#ef4444' }}>
+                {formatCurrency(cashBalance, currency)}
               </span>
+            </div>
+            {holdings.length > 0 && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#6366f1' }} />
+                  <span className="text-[12px] text-white/55">Investments</span>
+                </div>
+                <span className="text-[13px] font-semibold tabular-nums text-white/75">
+                  {formatCurrency(portfolioValue, currency)}
+                </span>
+              </div>
             )}
-          </div>
-          {/* Chart */}
-          <div className="-mx-5">
-            <PriceChart data={chartData} color={chartColor} width={350} height={90}
-              formatValue={v => formatCurrency(v, 'USD')} />
-          </div>
-          {/* Range tabs */}
-          <div className="flex gap-1 mt-2 p-1 rounded-xl bg-black/25">
-            {ranges.map(r => (
-              <button key={r} onClick={() => setRange(r)}
-                className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors"
-                style={range === r ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
-                {r}
-              </button>
-            ))}
+            <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <span className="text-[12px] font-bold text-white/85">Net Worth</span>
+              <span className="text-[15px] font-bold tabular-nums" style={{ color: isNetWorthUp ? '#86efac' : '#ef4444' }}>
+                {formatCurrency(netWorth, currency)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* INFLOW / OUTFLOW cards */}
+      {/* Monthly Summary */}
       {transactions.length > 0 && (
-        <div className="mx-5 mt-3 grid grid-cols-2 gap-3">
+        <div className="mx-5 mt-3">
           <div className="glass-card-small p-4">
-            <div className="iq-label mb-1" style={{ color: '#52525b' }}>Inflow</div>
-            <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#22c55e' }}>
-              {formatCurrency(periodTotals.income, currency)}
+            <div className="iq-label mb-3">{MONTH_NAMES[viewMonth - 1]} Summary</div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <div className="text-[11px] text-white/40 mb-0.5">Income</div>
+                <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#22c55e' }}>
+                  {formatCurrency(periodTotals.income, currency)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-white/40 mb-0.5">Expenses</div>
+                <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#f43f5e' }}>
+                  {formatCurrency(Math.abs(periodTotals.expenses), currency)}
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="glass-card-small p-4">
-            <div className="iq-label mb-1" style={{ color: '#52525b' }}>Outflow</div>
-            <div className="text-[22px] font-semibold tabular-nums tracking-tight" style={{ color: '#f43f5e' }}>
-              {formatCurrency(Math.abs(periodTotals.expenses), currency)}
+            <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-white/50">Net this month</span>
+                <span className="text-[13px] font-bold tabular-nums"
+                  style={{ color: periodTotals.net >= 0 ? '#22c55e' : '#ef4444' }}>
+                  {periodTotals.net >= 0 ? '+' : ''}{formatCurrency(periodTotals.net, currency)}
+                </span>
+              </div>
+              {savingsRate !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-white/50">Savings rate</span>
+                  <span className="text-[12px] font-semibold tabular-nums"
+                    style={{ color: savingsRate >= 20 ? '#22c55e' : savingsRate >= 10 ? '#f59e0b' : '#ef4444' }}>
+                    {savingsRate.toFixed(0)}%
+                  </span>
+                </div>
+              )}
+              {periodTotals.count === 0 && (
+                <div className="text-center text-[12px] py-1" style={{ color: '#52525b' }}>No transactions this month</div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Allocation */}
-      {holdings.length > 0 && geoSlices.length > 0 && (
-        <div className="mx-5 mt-3">
+      {/* Investment quick stats */}
+      {holdings.length > 0 && (
+        <div className="mx-5 mt-3 mb-2">
           <div className="glass-card-small p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="iq-label">Allocation</div>
-              <div className="flex gap-0.5 p-0.5 rounded-lg bg-black/30">
-                {[['geo','Geo'],['asset','Asset'],['sector','Sector']].map(([key,label]) => (
-                  <button key={key} onClick={() => setAllocTab(key)}
-                    className="px-2.5 py-1 rounded-md text-[9px] font-bold transition-colors"
-                    style={allocTab === key ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
-                    {label}
-                  </button>
-                ))}
+            <div className="iq-label mb-3">Investments</div>
+            <div className="grid grid-cols-3 gap-0 divide-x divide-white/5">
+              <div className="pr-3">
+                <div className="text-[11px] text-white/40 mb-0.5">Holdings</div>
+                <div className="text-[20px] font-bold tracking-tight">{holdings.length}</div>
               </div>
-            </div>
-            <AllocationBar slices={allocationSlices} />
-            <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-3">
-              {allocationSlices.map(s => (
-                <div key={s.label} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
-                  <span className="text-[12px] font-semibold text-white/80">{s.label}</span>
-                  <span className="text-[12px] text-white/50 tabular-nums">{s.value.toFixed(0)}%</span>
+              <div className="px-3">
+                <div className="text-[11px] text-white/40 mb-0.5">Value</div>
+                <div className="text-[13px] font-bold tracking-tight tabular-nums leading-tight mt-0.5">
+                  {formatCurrency(portfolioValue, currency)}
                 </div>
-              ))}
+              </div>
+              <div className="pl-3">
+                <div className="text-[11px] text-white/40 mb-0.5">All-time</div>
+                <div className="text-[20px] font-bold tracking-tight tabular-nums"
+                  style={{ color: allTimePct >= 0 ? '#22c55e' : '#ef4444' }}>
+                  {allTimePct >= 0 ? '+' : ''}{allTimePct.toFixed(1)}%
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1058,7 +1089,7 @@ function AddTransactionSheet({ initial, defaultCurrency, onClose, onSave, onDele
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+      <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto sheet-enter"
         style={{
           background: '#0A0A0A',
           boxShadow: '0 -20px 40px rgba(0,0,0,0.6)',
@@ -1143,7 +1174,7 @@ function AddTransactionSheet({ initial, defaultCurrency, onClose, onSave, onDele
 
         <button onClick={handleSubmit}
           className="w-full h-[52px] mt-4 rounded-2xl font-bold text-[15px] tracking-tight text-black"
-          style={{ background: '#D4AF37', boxShadow: '0 10px 30px rgba(212,175,55,0.25)' }}>
+          style={{ background: '#86efac', boxShadow: '0 10px 30px rgba(134,239,172,0.25)' }}>
           {isEdit ? 'Save changes' : 'Save transaction'}
         </button>
       </div>
@@ -1174,7 +1205,7 @@ function BudgetSheet({ budgets, defaultCurrency, onClose, onSave, onDelete }) {
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 max-h-[88dvh] overflow-y-auto"
+      <div className="relative text-white rounded-t-[28px] p-5 max-h-[88dvh] overflow-y-auto sheet-enter"
         style={{ background: '#0A0A0A', boxShadow: '0 -20px 40px rgba(0,0,0,0.6)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
         <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-4">
@@ -1207,7 +1238,7 @@ function BudgetSheet({ budgets, defaultCurrency, onClose, onSave, onDelete }) {
         </div>
         <button onClick={handleSaveAll}
           className="w-full h-[52px] mt-5 rounded-2xl font-bold text-[15px] tracking-tight text-black"
-          style={{ background: '#D4AF37', boxShadow: '0 10px 30px rgba(212,175,55,0.25)' }}>
+          style={{ background: '#86efac', boxShadow: '0 10px 30px rgba(134,239,172,0.25)' }}>
           Save budgets
         </button>
       </div>
@@ -1234,7 +1265,7 @@ function RecurringSheet({ templates, defaultCurrency, onClose, onSave, onDelete 
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+      <div className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto sheet-enter"
         style={{ background: '#0A0A0A', boxShadow: '0 -20px 40px rgba(0,0,0,0.6)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
         <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: '#27272a' }} />
         <div className="flex items-center justify-between mb-4">
@@ -1307,7 +1338,7 @@ function RecurringSheet({ templates, defaultCurrency, onClose, onSave, onDelete 
             </SheetField>
             <div className="flex gap-2 mt-2">
               <button onClick={() => setAdding(false)} className="flex-1 h-11 rounded-2xl bg-white/5 text-white/70 font-semibold text-[13px]">Cancel</button>
-              <button onClick={handleAdd} className="flex-1 h-11 rounded-2xl font-bold text-[13px] text-black" style={{ background: '#D4AF37' }}>Add</button>
+              <button onClick={handleAdd} className="flex-1 h-11 rounded-2xl font-bold text-[13px] text-black" style={{ background: '#86efac' }}>Add</button>
             </div>
           </div>
         ) : (
@@ -1449,14 +1480,14 @@ function ActivityScreen({
             {geminiKey && (
               <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
                 className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 text-[10px] font-semibold disabled:opacity-50"
-                style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+                style={{ border: '1px solid rgba(134,239,172,0.4)', color: '#86efac', background: 'rgba(134,239,172,0.06)' }}>
                 {scanning ? (
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="animate-spin">
-                    <circle cx="12" cy="12" r="10" stroke="#D4AF37" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12" />
+                    <circle cx="12" cy="12" r="10" stroke="#86efac" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12" />
                   </svg>
                 ) : (
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#86efac" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 )}
                 Scan
@@ -1488,7 +1519,7 @@ function ActivityScreen({
           <button onClick={prevMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
             <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#D4AF37' }}>
+          <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#86efac' }}>
             {MONTH_NAMES[viewMonth - 1]} {viewYear}
           </span>
           <button onClick={nextMonth} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
@@ -1531,6 +1562,23 @@ function ActivityScreen({
               </div>
             ))}
           </div>
+          {totals.income > 0 && (() => {
+            const savingsRate = ((totals.income - Math.abs(totals.expenses)) / totals.income) * 100
+            const srColor = savingsRate >= 20 ? '#22c55e' : savingsRate >= 0 ? '#f59e0b' : '#f43f5e'
+            return (
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                <div>
+                  <div className="iq-label mb-0.5" style={{ color: '#52525b' }}>Savings rate</div>
+                  <div className="text-[11px] text-white/35">
+                    {savingsRate >= 20 ? 'On track' : savingsRate >= 0 ? 'Could improve' : 'Over budget'}
+                  </div>
+                </div>
+                <div className="text-[28px] font-bold tabular-nums tracking-tight" style={{ color: srColor }}>
+                  {savingsRate.toFixed(0)}%
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -1542,7 +1590,7 @@ function ActivityScreen({
               {['EXPENSE', 'INCOME'].map(t => (
                 <button key={t} onClick={() => setCatTab(t)}
                   className="flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors"
-                  style={catTab === t ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
+                  style={catTab === t ? { background: 'rgba(134,239,172,0.15)', color: '#86efac' } : { color: 'rgba(255,255,255,0.35)' }}>
                   {t === 'EXPENSE' ? 'Expenses' : 'Income'}
                 </button>
               ))}
@@ -1588,7 +1636,7 @@ function ActivityScreen({
 
       {/* Transaction list */}
       {grouped.length > 0 ? (
-        <div className="mx-5 mt-4 space-y-3">
+        <div className="mx-5 mt-4 space-y-3 stagger">
           {grouped.map(g => (
             <div key={g.date}>
               <div className="iq-label mb-1.5 px-1" style={{ color: '#52525b' }}>
@@ -1620,6 +1668,7 @@ function SettingsScreen({
   currency, onToggleCurrency, onExportCsv,
   cloudAvailable, session, syncing,
   onSignIn, onSignOut,
+  holdingsCount, transactionsCount,
 }) {
   const email = session?.user?.email
   const displayName = email ? email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1) : 'You'
@@ -1644,14 +1693,14 @@ function SettingsScreen({
         <div className="glass-card p-5">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-[24px] font-bold shrink-0"
-              style={{ background: 'rgba(212,175,55,0.12)', border: '1.5px solid rgba(212,175,55,0.4)', color: '#D4AF37' }}>
+              style={{ background: 'rgba(134,239,172,0.12)', border: '1.5px solid rgba(134,239,172,0.4)', color: '#86efac' }}>
               {initial}
             </div>
             <div>
               <div className="text-[20px] font-semibold tracking-tight">{displayName}</div>
               <div className="flex items-center gap-1.5 mt-1">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4AF37' }} />
-                <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#D4AF37' }}>Premium Member</span>
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#86efac' }} />
+                <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#86efac' }}>Premium Member</span>
               </div>
             </div>
           </div>
@@ -1665,7 +1714,7 @@ function SettingsScreen({
               <span className="text-[14px] font-medium">Base Currency</span>
               <button onClick={onToggleCurrency}
                 className="h-9 px-4 rounded-xl font-bold text-[13px]"
-                style={{ border: '1px solid rgba(212,175,55,0.4)', color: '#D4AF37', background: 'rgba(212,175,55,0.06)' }}>
+                style={{ border: '1px solid rgba(134,239,172,0.4)', color: '#86efac', background: 'rgba(134,239,172,0.06)' }}>
                 {currency === 'ILS' ? 'ILS ₪' : 'USD $'}
               </button>
             </div>
@@ -1673,10 +1722,27 @@ function SettingsScreen({
               <span className="text-[14px] font-medium">Notifications</span>
               <button onClick={toggleNotifications}
                 className="w-12 h-6 rounded-full relative transition-colors"
-                style={{ background: notificationsOn ? '#D4AF37' : 'rgba(255,255,255,0.1)' }}>
+                style={{ background: notificationsOn ? '#86efac' : 'rgba(255,255,255,0.1)' }}>
                 <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
                   style={{ left: notificationsOn ? '26px' : '2px' }} />
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Portfolio Stats */}
+        <div className="glass-card-small p-4">
+          <div className="iq-label mb-3">Portfolio stats</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/3 rounded-2xl p-3">
+              <div className="text-[11px] text-white/40 mb-1">Holdings</div>
+              <div className="text-[24px] font-bold tracking-tight">{holdingsCount ?? 0}</div>
+              <div className="text-[10px] text-white/30 mt-0.5">active positions</div>
+            </div>
+            <div className="bg-white/3 rounded-2xl p-3">
+              <div className="text-[11px] text-white/40 mb-1">Transactions</div>
+              <div className="text-[24px] font-bold tracking-tight">{transactionsCount ?? 0}</div>
+              <div className="text-[10px] text-white/30 mt-0.5">all time</div>
             </div>
           </div>
         </div>
@@ -1685,7 +1751,7 @@ function SettingsScreen({
         <div className="glass-card-small p-4">
           <div className="iq-label mb-3">Data &amp; Security</div>
           <button onClick={onExportCsv}
-            className="w-full flex items-center justify-between h-11 px-1">
+            className="pressable w-full flex items-center justify-between h-11 px-1">
             <span className="text-[14px] font-medium">Export Ledger CSV</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1703,7 +1769,7 @@ function SettingsScreen({
               <>
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-[14px]"
-                    style={{ background: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.5)', color: '#D4AF37' }}>
+                    style={{ background: 'rgba(134,239,172,0.1)', border: '1.5px solid rgba(134,239,172,0.5)', color: '#86efac' }}>
                     {email?.[0]?.toUpperCase() || '·'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1723,7 +1789,7 @@ function SettingsScreen({
                 </div>
                 <button onClick={onSignIn}
                   className="w-full h-10 rounded-xl text-black font-bold text-[12px]"
-                  style={{ background: '#D4AF37' }}>
+                  style={{ background: '#86efac' }}>
                   Sign in / Create account
                 </button>
               </>
@@ -1734,7 +1800,7 @@ function SettingsScreen({
         {/* App branding */}
         <div className="pt-2 pb-1 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#D4AF37', boxShadow: '0 0 6px rgba(212,175,55,0.6)' }} />
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#86efac', boxShadow: '0 0 6px rgba(134,239,172,0.6)' }} />
             <span style={{ fontWeight: 300, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>IQ.FINANCE</span>
           </div>
           <div className="text-[10px]" style={{ color: '#3f3f46' }}>Luxury portfolio intelligence</div>
@@ -1778,7 +1844,7 @@ function AuthSheet({ onClose, onSignedIn }) {
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <form onSubmit={handleSubmit} className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto"
+      <form onSubmit={handleSubmit} className="relative text-white rounded-t-[28px] p-5 max-h-[92dvh] overflow-y-auto sheet-enter"
         style={{
           background: '#0A0A0A',
           boxShadow: '0 -20px 40px rgba(0,0,0,0.6)',
@@ -1818,13 +1884,13 @@ function AuthSheet({ onClose, onSignedIn }) {
 
         <button type="submit" disabled={busy}
           className="w-full h-[48px] mt-5 rounded-2xl font-bold text-[14px] tracking-tight text-black disabled:opacity-50"
-          style={{ background: '#D4AF37' }}>
+          style={{ background: '#86efac' }}>
           {busy ? '…' : mode === 'signup' ? 'Create account' : 'Sign in'}
         </button>
 
         <div className="mt-4 text-center text-[12px] text-white/50">
           {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button type="button" style={{ color: '#D4AF37' }} className="font-semibold"
+          <button type="button" style={{ color: '#86efac' }} className="font-semibold"
             onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setInfo('') }}>
             {mode === 'signup' ? 'Sign in' : 'Create one'}
           </button>
@@ -1855,6 +1921,11 @@ function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, on
   const gainers = useMemo(() => [...enriched].filter(h => h.dayChange > 0).sort((a, b) => b.dayChange - a.dayChange).slice(0, 3), [enriched])
   const losers = useMemo(() => [...enriched].filter(h => h.dayChange < 0).sort((a, b) => a.dayChange - b.dayChange).slice(0, 3), [enriched])
 
+  const todayPnL = useMemo(() =>
+    enriched.reduce((sum, h) => sum + (h._metrics?.currentValue ?? 0) * (h.dayChange / 100), 0),
+  [enriched])
+  const todayPnLColor = todayPnL >= 0 ? '#22c55e' : '#ef4444'
+
   if (!enriched.length) {
     return (
       <div className="flex flex-col items-center justify-center" style={{
@@ -1864,9 +1935,9 @@ function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, on
       }}>
         <div className="text-center px-8">
           <div className="mb-5 flex items-center justify-center">
-            <div style={{ width: 56, height: 56, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', background: 'rgba(212,175,55,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', border: '1px solid rgba(134,239,172,0.3)', background: 'rgba(134,239,172,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M3 6h18M3 12h18M3 18h12" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" />
+                <path d="M3 6h18M3 12h18M3 18h12" stroke="#86efac" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </div>
           </div>
@@ -1885,17 +1956,36 @@ function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, on
       paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
       {/* Header */}
-      <div className="flex items-start justify-between px-5 pt-3 pb-2">
-        <div>
-          <div className="text-[26px] font-bold tracking-tight leading-none">HOLDINGS</div>
-          <div className="text-[13px] mt-0.5" style={{ color: '#71717a' }}>האחזקות שלי</div>
-        </div>
-        <div className="text-right">
-          <div className="text-[16px] font-semibold tabular-nums tracking-tight">{totalDisplay}</div>
-          <div className="text-[12px] font-semibold tabular-nums" style={{ color: isAllTimeUp ? '#22c55e' : '#ef4444' }}>
-            {isAllTimeUp ? '+' : ''}{allTimePct.toFixed(2)}%
+      <div className="px-5 pt-3 pb-2">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <div className="text-[26px] font-bold tracking-tight leading-none">HOLDINGS</div>
+            <div className="text-[13px] mt-0.5" style={{ color: '#71717a' }}>
+              {enriched.length} {enriched.length === 1 ? 'position' : 'positions'}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[16px] font-semibold tabular-nums tracking-tight">{totalDisplay}</div>
+            <div className="text-[12px] font-semibold tabular-nums" style={{ color: isAllTimeUp ? '#22c55e' : '#ef4444' }}>
+              {isAllTimeUp ? '+' : ''}{allTimePct.toFixed(2)}% all time
+            </div>
           </div>
         </div>
+        {enriched.some(h => h.dayChange !== 0) && (
+          <div className="glass-card-small px-4 py-3 flex items-center justify-between">
+            <div>
+              <div className="iq-label mb-0.5" style={{ color: '#52525b' }}>Today&apos;s P&amp;L</div>
+              <div className="text-[11px] text-white/35">
+                {gainers.length} gainer{gainers.length !== 1 ? 's' : ''} · {losers.length} loser{losers.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[22px] font-bold tabular-nums tracking-tight" style={{ color: todayPnLColor }}>
+                {todayPnL >= 0 ? '+' : ''}{formatCurrency(Math.abs(todayPnL), 'USD')}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Holdings list */}
@@ -1904,11 +1994,11 @@ function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, on
           <span className="iq-label">Portfolio · {enriched.length}</span>
           <button onClick={() => setEditMode(m => !m)}
             className="text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors"
-            style={editMode ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.45)' }}>
+            style={editMode ? { background: 'rgba(134,239,172,0.15)', color: '#86efac' } : { color: 'rgba(255,255,255,0.45)' }}>
             {editMode ? 'Done' : 'Edit'}
           </button>
         </div>
-        <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
+        <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5 stagger">
           {(editMode ? enriched : sorted).map((h, i, arr) => (
             editMode ? (
               <div key={h.ticker} className="flex items-center gap-2 px-3 py-2">
@@ -1984,7 +2074,7 @@ function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, on
             {filters.map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className="px-2 py-0.5 rounded-md text-[9px] font-bold transition-colors"
-                style={filter === f ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
+                style={filter === f ? { background: 'rgba(134,239,172,0.15)', color: '#86efac' } : { color: 'rgba(255,255,255,0.35)' }}>
                 {f}
               </button>
             ))}
@@ -2000,7 +2090,7 @@ function HoldingsScreen({ holdings, enriched, prices, exchangeRate, currency, on
             return (
               <button key={h.ticker} onClick={() => onSelectHolding(h)}
                 className="w-full flex items-center gap-3 px-4 py-3 bg-transparent border-0 text-left hover:bg-white/3 transition-colors">
-                <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', display: 'inline-flex' }}>
+                <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(134,239,172,0.3)', display: 'inline-flex' }}>
                   <Logo ticker={h.ticker} size={34} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -2062,12 +2152,12 @@ function MarketsScreen({ enriched, onSelectHolding }) {
           <div className="mb-5 flex items-center justify-center">
             <div style={{
               width: 56, height: 56, borderRadius: '50%',
-              border: '1px solid rgba(212,175,55,0.3)',
-              background: 'rgba(212,175,55,0.06)',
+              border: '1px solid rgba(134,239,172,0.3)',
+              background: 'rgba(134,239,172,0.06)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M3 17l4-4 4 4 7-7 3 3" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3 17l4-4 4 4 7-7 3 3" stroke="#86efac" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
           </div>
@@ -2133,7 +2223,7 @@ function MarketsScreen({ enriched, onSelectHolding }) {
             {filters.map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className="px-2 py-0.5 rounded-md text-[9px] font-bold transition-colors"
-                style={filter === f ? { background: 'rgba(212,175,55,0.15)', color: '#D4AF37' } : { color: 'rgba(255,255,255,0.35)' }}>
+                style={filter === f ? { background: 'rgba(134,239,172,0.15)', color: '#86efac' } : { color: 'rgba(255,255,255,0.35)' }}>
                 {f}
               </button>
             ))}
@@ -2149,7 +2239,7 @@ function MarketsScreen({ enriched, onSelectHolding }) {
             return (
               <button key={h.ticker} onClick={() => onSelectHolding(h)}
                 className="w-full flex items-center gap-3 px-4 py-3 bg-transparent border-0 text-left hover:bg-white/3 transition-colors">
-                <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', display: 'inline-flex' }}>
+                <div style={{ padding: 2, borderRadius: '50%', border: '1px solid rgba(134,239,172,0.3)', display: 'inline-flex' }}>
                   <Logo ticker={h.ticker} size={34} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -2454,7 +2544,7 @@ export default function App() {
       overflow: 'hidden',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
       WebkitFontSmoothing: 'antialiased',
-      backgroundImage: 'radial-gradient(at 80% 10%, rgba(212,175,55,0.05), transparent 55%), radial-gradient(at 15% 90%, rgba(212,175,55,0.03), transparent 60%)',
+      backgroundImage: 'radial-gradient(at 80% 10%, rgba(134,239,172,0.05), transparent 55%), radial-gradient(at 15% 90%, rgba(134,239,172,0.03), transparent 60%)',
     }}>
       <div className="max-w-[430px] mx-auto relative" style={{ height: '100dvh', overflow: 'hidden' }}>
         <AppHeader
@@ -2463,7 +2553,7 @@ export default function App() {
           onRefresh={refresh}
           loading={loading}
         />
-        <div className="absolute inset-0">
+        <div key={activeTab} className="absolute inset-0 screen-enter">
           {activeTab === 'networth' && (
             <NetWorthScreen
               holdings={holdings} enriched={enriched} prices={prices}
@@ -2500,6 +2590,8 @@ export default function App() {
               session={session} syncing={syncing}
               onSignIn={() => setShowAuth(true)}
               onSignOut={handleSignOut}
+              holdingsCount={holdings.length}
+              transactionsCount={transactions.length}
             />
           )}
         </div>
