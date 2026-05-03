@@ -96,18 +96,6 @@ const SECTOR_COLORS = {
   Consumer:'#06b6d4', Index:'#8b5cf6', Crypto:'#f97316', IL:'#3b82f6', Other:'rgba(255,255,255,0.25)',
 }
 
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth >= 768
-  )
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const handler = e => setIsDesktop(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-  return isDesktop
-}
 
 function generateLogo(ticker) {
   const base = displaySymbol(ticker).replace('.TA', '').toUpperCase()
