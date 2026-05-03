@@ -64,31 +64,6 @@ function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
   })
 }
 
-function buildPortfolioReturnCurve(enriched, exchangeRate, numPts = 90) {
-  const now = Date.now()
-  const withDates = enriched
-    .filter(h => h._holding.purchaseDate && h._metrics)
-    .sort((a, b) => new Date(a._holding.purchaseDate) - new Date(b._holding.purchaseDate))
-
-  if (!withDates.length) return sparklinePoints(42, numPts)
-
-  const oldestDate = new Date(withDates[0]._holding.purchaseDate).getTime()
-  const span = now - oldestDate || 1
-
-  return Array.from({ length: numPts }, (_, i) => {
-    const pointTime = oldestDate + (i / (numPts - 1)) * span
-    let total = 0
-    for (const h of withDates) {
-      const t0 = new Date(h._holding.purchaseDate).getTime()
-      if (t0 > pointTime) continue
-      const progress = Math.min((pointTime - t0) / (now - t0 || 1), 1)
-      const factor = h.market === 'IL' ? 1 / exchangeRate : 1
-      total += (h._metrics.adjustedCostBasis + progress * (h._metrics.currentValue - h._metrics.adjustedCostBasis)) * factor
-    }
-    return total
-  })
-}
-
 // ─── logo ─────────────────────────────────────────────────────────────────────
 const LOGO_COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6']
 
