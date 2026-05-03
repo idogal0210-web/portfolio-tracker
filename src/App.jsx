@@ -2224,6 +2224,8 @@ function MarketsScreen({ enriched, onSelectHolding }) {
 export default function App() {
   // ── portfolio state ────────────────────────────────────────────────────────
   const [holdings, setHoldings] = useState(() => loadHoldings())
+  const holdingsRef = useRef(holdings)
+  useEffect(() => { holdingsRef.current = holdings }, [holdings])
   const [prices, setPrices] = useState(() => loadPricesCache() ?? {})
   const [exchangeRate, setExchangeRate] = useState(3.7)
   const [loading, setLoading] = useState(false)
@@ -2335,10 +2337,10 @@ export default function App() {
   const refresh = useCallback(async () => {
     setLoading(true); setStale(false)
     try {
-      let currentHoldings = holdings
+      let currentHoldings = holdingsRef.current
       if (userId) {
         const cloudH = await fetchHoldings()
-        if (cloudH.length > 0 || holdings.length === 0) {
+        if (cloudH.length > 0 || currentHoldings.length === 0) {
           currentHoldings = cloudH
           setHoldings(cloudH)
           saveHoldings(cloudH)
@@ -2354,7 +2356,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [holdings, apiKey, userId])
+  }, [apiKey, userId])
 
   useEffect(() => { refresh() }, [refresh]) // eslint-disable-line react-hooks/set-state-in-effect
 
