@@ -2333,10 +2333,19 @@ export default function App() {
 
   // ── price refresh ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
-    if (!holdings.length) return
     setLoading(true); setStale(false)
     try {
-      const { priceMap, exchangeRate: rate } = await fetchPrices(holdings.map(h => h.symbol), apiKey)
+      let currentHoldings = holdings
+      if (userId) {
+        const cloudH = await fetchHoldings()
+        if (cloudH.length > 0 || holdings.length === 0) {
+          currentHoldings = cloudH
+          setHoldings(cloudH)
+          saveHoldings(cloudH)
+        }
+      }
+      if (!currentHoldings.length) return
+      const { priceMap, exchangeRate: rate } = await fetchPrices(currentHoldings.map(h => h.symbol), apiKey)
       setPrices(priceMap)
       setExchangeRate(rate)
       savePricesCache(priceMap)
@@ -2345,7 +2354,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [holdings, apiKey])
+  }, [holdings, apiKey, userId])
 
   useEffect(() => { refresh() }, [refresh]) // eslint-disable-line react-hooks/set-state-in-effect
 
