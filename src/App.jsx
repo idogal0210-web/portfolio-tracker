@@ -18,10 +18,9 @@ import {
   upsertHolding, deleteHoldingBySymbol,
   upsertTransaction, deleteTransaction,
   upsertBudget, deleteBudget,
-  upsertRecurring, deleteRecurring
-} from './supabase'
-
-import { fetchPrices } from './api'
+  upsertRecurring, deleteRecurring,
+  fetchPrices
+} from './api'
 
 import { AppHeader, TabBar, FloatingActionButton } from './components/ui'
 import { HoldingDetail, AddHoldingSheet, AddTransactionSheet, BudgetSheet, RecurringSheet, AuthSheet } from './components/features'

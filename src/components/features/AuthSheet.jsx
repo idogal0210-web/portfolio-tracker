@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { signUp, signInWithPassword } from '../../supabase'
+import { signUp, signInWithPassword } from '../../api'
 
 export function AuthSheet({ onClose, onSignedIn }) {
   const [mode, setMode] = useState('signin')
