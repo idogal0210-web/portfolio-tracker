@@ -1,0 +1,6 @@
+{
+	"appId": "com.idogal.portfoliotracker",
+	"appName": "Portfolio Tracker",
+	"webDir": "dist",
+	"packageClassList": []
+}
