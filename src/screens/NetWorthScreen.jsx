@@ -1,9 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import {
   calculateTotals, calculateAllTimeReturn, calculateMonthlyTotals,
-  convertAmount, displaySymbol, formatCurrency
+  convertAmount, formatCurrency
 } from '../utils'
-import { callGemini } from '../gemini'
 
 export function NetWorthScreen({ holdings, enriched, prices, exchangeRate, currency, stale, transactions, displayName }) {
   const { totalUSD, totalILS } = calculateTotals(holdings, prices, exchangeRate)
@@ -26,39 +25,6 @@ export function NetWorthScreen({ holdings, enriched, prices, exchangeRate, curre
 
   const portfolioValue = currency === 'ILS' ? totalILS : totalUSD
   const netWorth = cashBalance + portfolioValue
-
-  const geminiKey = import.meta.env.VITE_GEMINI_KEY
-  const [insights, setInsights] = useState('')
-  const [insightsLoading, setInsightsLoading] = useState(false)
-  const [insightsError, setInsightsError] = useState('')
-  const [insightsOpen, setInsightsOpen] = useState(false)
-
-  async function handleGetInsights() {
-    setInsightsLoading(true)
-    setInsightsError('')
-    setInsightsOpen(true)
-    try {
-      const portfolioSummary = enriched.map(h =>
-        `${displaySymbol(h.ticker)} (${h.market}): ${h.qty} shares, value ${formatCurrency(h._metrics?.currentValue ?? 0, h.market === 'IL' ? 'ILS' : 'USD')}, ROI ${h._metrics?.roiPct?.toFixed(1) ?? 0}%`
-      ).join('\n')
-      const recentTxns = (transactions || []).slice(-20).map(t =>
-        `${t.date} ${t.type} ${t.category} ${formatCurrency(t.amount, t.currency)}${t.note ? ' — ' + t.note : ''}`
-      ).join('\n')
-      const payload = {
-        contents: [{
-          parts: [{
-            text: `You are a concise personal finance advisor. Analyze this cash flow and portfolio data and provide 3–5 bullet-point insights. Be brief.\n\nCash balance: ${formatCurrency(cashBalance, currency)}\nInvestments: ${formatCurrency(portfolioValue, currency)}\nTotal net worth: ${formatCurrency(netWorth, currency)}\n\nHoldings:\n${portfolioSummary || 'None'}\n\nRecent transactions (last 20):\n${recentTxns || 'None'}`,
-          }],
-        }],
-      }
-      const result = await callGemini(payload)
-      setInsights(result)
-    } catch {
-      setInsightsError('Unable to fetch insights')
-    } finally {
-      setInsightsLoading(false)
-    }
-  }
 
   return (
     <div className="overflow-y-auto no-scrollbar" style={{
@@ -152,44 +118,6 @@ export function NetWorthScreen({ holdings, enriched, prices, exchangeRate, curre
           </div>
         </div>
       </div>
-
-      {geminiKey && (holdings.length > 0 || transactions.length > 0) && (
-        <div className="mx-5 mb-4">
-          <button onClick={handleGetInsights} disabled={insightsLoading}
-            className="pressable w-full flex items-center gap-3 px-4 py-4 rounded-[20px] disabled:opacity-60 border-none cursor-pointer"
-            style={{
-              background: 'linear-gradient(135deg, rgba(134,239,172,0.12) 0%, rgba(101,163,13,0.08) 100%)',
-              border: '1px solid rgba(134,239,172,0.25)',
-            }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className={insightsLoading ? 'animate-spin' : ''}>
-              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"
-                stroke="#86efac" strokeWidth="1.5" strokeLinejoin="round" fill="rgba(134,239,172,0.15)" />
-              <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"
-                stroke="#86efac" strokeWidth="1.3" strokeLinejoin="round" />
-            </svg>
-            <span className="text-[14px] font-semibold" style={{ color: '#86efac' }}>
-              {insightsLoading ? 'Analyzing…' : 'Get AI Insights'}
-            </span>
-          </button>
-          {insightsOpen && (
-            <div className="mt-2 glass-panel rounded-2xl px-4 py-3">
-              {insightsError ? (
-                <p className="text-[12px]" style={{ color: '#71717a' }}>{insightsError}</p>
-              ) : insightsLoading ? (
-                <p className="text-[12px]" style={{ color: '#71717a' }}>Thinking…</p>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="iq-label">AI Insights</span>
-                    <button onClick={() => setInsightsOpen(false)} className="text-white/30 text-[16px] leading-none border-none bg-transparent cursor-pointer">×</button>
-                  </div>
-                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-300">{insights}</p>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

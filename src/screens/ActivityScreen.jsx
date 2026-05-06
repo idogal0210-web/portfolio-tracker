@@ -1,10 +1,9 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo } from 'react'
 import {
   calculateMonthlyTotals, aggregateByCategory, groupTransactionsByDate,
   calculateMonthlyTrend, budgetProgress, convertAmount, formatCurrency,
   formatDateLabel, MONTH_NAMES, EXPENSE_CATEGORIES, INCOME_CATEGORIES
 } from '../utils'
-import { callGemini } from '../gemini'
 import { AllocationBar } from '../components/ui'
 import { MonthSparkline, TransactionRow } from '../components/features'
 
@@ -17,57 +16,6 @@ export function ActivityScreen({
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1)
   const [catTab, setCatTab] = useState('EXPENSE')
   const [showOverflow, setShowOverflow] = useState(false)
-  const [scanning, setScanning] = useState(false)
-  const scanInputRef = useRef(null)
-  const geminiKey = import.meta.env.VITE_GEMINI_KEY
-  const todayIso = new Date().toISOString().slice(0, 10)
-
-  async function handleScanFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-    setScanning(true)
-    try {
-      let parts
-      if (file.name.endsWith('.csv') || file.type === 'text/csv') {
-        const text = await file.text()
-        parts = [{
-          text: `Parse financial transactions from this CSV and return ONLY a JSON array, no explanation.\nEach item: {"amount":number,"category":string,"note":string,"currency":"USD"|"ILS","type":"INCOME"|"EXPENSE"}\nExpense categories: ${EXPENSE_CATEGORIES.join(', ')}\nIncome categories: ${INCOME_CATEGORIES.join(', ')}\n\nCSV:\n${text}`,
-        }]
-      } else {
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result.split(',')[1])
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
-        parts = [
-          { inline_data: { mime_type: file.type || 'image/jpeg', data: base64 } },
-          { text: `Parse financial transactions from this document and return ONLY a JSON array, no explanation.\nEach item: {"amount":number,"category":string,"note":string,"currency":"USD"|"ILS","type":"INCOME"|"EXPENSE"}\nExpense categories: ${EXPENSE_CATEGORIES.join(', ')}\nIncome categories: ${INCOME_CATEGORIES.join(', ')}` },
-        ]
-      }
-      const parsed = await callGemini({ contents: [{ parts }] }, true)
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No transactions found')
-      let saved = 0
-      for (const item of parsed) {
-        if (!item.amount || !item.type) continue
-        onSaveTxn({
-          type: item.type,
-          amount: Number(item.amount),
-          currency: item.currency || currency,
-          category: item.category || (item.type === 'INCOME' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]),
-          note: item.note || '',
-          date: todayIso,
-        })
-        saved++
-      }
-      if (saved === 0) throw new Error('No valid transactions found')
-    } catch (err) {
-      alert('Scan failed: ' + (err?.message || 'Could not parse document'))
-    } finally {
-      setScanning(false)
-    }
-  }
 
   const monthTxns = useMemo(
     () => transactions.filter(t => t.date?.startsWith(`${viewYear}-${String(viewMonth).padStart(2, '0')}`)),
@@ -109,9 +57,6 @@ export function ActivityScreen({
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
-      <input ref={scanInputRef} type="file" accept=".csv,image/*,.pdf"
-        className="hidden" onChange={handleScanFile} />
-
       <div className="px-5 pt-3 pb-2">
         <div className="flex items-start justify-between">
           <div>
@@ -119,22 +64,6 @@ export function ActivityScreen({
             <div className="text-[13px] mt-0.5" style={{ color: '#71717a' }}>INCOME &amp; EXPENSES</div>
           </div>
           <div className="flex items-center gap-2 pt-1">
-            {geminiKey && (
-              <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
-                className="pressable h-8 px-2.5 rounded-xl flex items-center gap-1.5 text-[10px] font-semibold disabled:opacity-50 border-none cursor-pointer"
-                style={{ border: '1px solid rgba(134,239,172,0.4)', color: '#86efac', background: 'rgba(134,239,172,0.06)' }}>
-                {scanning ? (
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="animate-spin">
-                    <circle cx="12" cy="12" r="10" stroke="#86efac" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12" />
-                  </svg>
-                ) : (
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#86efac" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                )}
-                Scan
-              </button>
-            )}
             <div className="relative">
               <button onClick={() => setShowOverflow(v => !v)}
                 className="pressable w-8 h-8 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/50 text-[16px] cursor-pointer">
