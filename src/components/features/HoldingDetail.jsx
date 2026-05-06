@@ -1,13 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { displaySymbol, formatCurrency } from '../../utils'
+import { displaySymbol, formatCurrency, formatCurrencyPrecise } from '../../utils'
 import { fetchHistory } from '../../api'
-import { Logo, PriceChart } from '../ui'
-
-// Define makeRand and priceHistoryPoints internally or move to a separate util if needed
-function makeRand(seed) {
-  let s = seed
-  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280 }
-}
+import { Logo, PriceChart, makeRand } from '../ui'
 
 function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
   const seed = symbol.charCodeAt(0) * 73 + symbol.length * 13
@@ -23,14 +17,6 @@ function priceHistoryPoints(symbol, startPrice, endPrice, days = 90) {
     const t = (r - lo) / ((hi - lo) || 1)
     return startPrice + t * (endPrice - startPrice)
   })
-}
-
-function formatCurrencyPrecise(value, currency) {
-  if (value == null || !isFinite(value)) return '—'
-  const abs = Math.abs(value)
-  const decimals = abs < 1 ? 4 : abs < 10 ? 3 : 2
-  const formatted = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-  return currency === 'ILS' ? `₪${formatted}` : `$${formatted}`
 }
 
 function DetailStat({ label, value, color }) {
@@ -64,7 +50,7 @@ export function HoldingDetail({ h, onBack, onDelete, apiKey }) {
     if (!apiKey) return
     fetchHistory(h.ticker, range, apiKey)
       .then(data => { if (data.length >= 2) setChartData(data) })
-      .catch(() => {})
+      .catch(err => console.error('fetchHistory failed:', err))
   }, [h.ticker, range, apiKey])
 
   const isUp = (metrics?.totalReturn ?? 0) >= 0

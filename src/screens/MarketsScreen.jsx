@@ -71,7 +71,7 @@ export function MarketsScreen({ enriched, onSelectHolding }) {
                     <div className="text-[12px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
                   </div>
                   <div className="text-[12px] font-bold tabular-nums" style={{ color: '#22c55e' }}>
-                    +{h.dayChange.toFixed(2)}%
+                    +{(h.dayChange ?? 0).toFixed(2)}%
                   </div>
                 </button>
               ))}
@@ -88,7 +88,7 @@ export function MarketsScreen({ enriched, onSelectHolding }) {
                     <div className="text-[12px] font-semibold truncate">{displaySymbol(h.ticker)}</div>
                   </div>
                   <div className="text-[12px] font-bold tabular-nums" style={{ color: '#f43f5e' }}>
-                    {h.dayChange.toFixed(2)}%
+                    {(h.dayChange ?? 0).toFixed(2)}%
                   </div>
                 </button>
               ))}
@@ -136,7 +136,7 @@ export function MarketsScreen({ enriched, onSelectHolding }) {
                     {price ? formatCurrencyPrecise(h.market === 'IL' ? price / 100 : price, mktCurrency) : '—'}
                   </div>
                   <div className="text-[12px] font-medium tabular-nums" style={{ color: dayColor }}>
-                    {h.dayChange === 0 ? '—' : `${h.dayChange > 0 ? '+' : ''}${h.dayChange.toFixed(2)}%`}
+                    {!h.dayChange ? '—' : `${h.dayChange > 0 ? '+' : ''}${h.dayChange.toFixed(2)}%`}
                   </div>
                 </div>
               </button>

@@ -238,8 +238,8 @@ export const summarizeMonth = (transactions, ref = new Date()) => {
     const d = new Date(t.date)
     if (d.getFullYear() !== y || d.getMonth() !== m) continue
     const amt = Number(t.amount) || 0
-    if (t.type === 'income') income += amt
-    else if (t.type === 'expense') expense += amt
+    if (t.type === 'INCOME') income += amt
+    else if (t.type === 'EXPENSE') expense += amt
   }
   return { income, expense, net: income - expense }
 }

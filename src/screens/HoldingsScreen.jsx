@@ -16,8 +16,6 @@ export function HoldingsScreen({ holdings, enriched, prices, exchangeRate, curre
   const isAllTimeUp = allTimePct >= 0
   const totalDisplay = currency === 'ILS' ? formatCurrency(totalILS, 'ILS') : formatCurrency(totalUSD, 'USD')
 
-  const sorted = useMemo(() => [...enriched].sort((a, b) => (b._metrics?.currentValue ?? 0) - (a._metrics?.currentValue ?? 0)), [enriched])
-
   const filtered = useMemo(() => {
     const list = [...enriched].sort((a, b) => (b._metrics?.currentValue ?? 0) - (a._metrics?.currentValue ?? 0))
     return filter === 'ALL' ? list : list.filter(h => h.market === filter)
