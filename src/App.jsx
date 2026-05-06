@@ -151,7 +151,8 @@ export default function App() {
       setPrices(priceMap)
       setExchangeRate(rate)
       savePricesCache(priceMap)
-    } catch {
+    } catch (err) {
+      console.error('Price refresh failed:', err)
       setStale(true)
     } finally {
       setLoading(false)
