@@ -1,3 +1,5 @@
+import { DEFAULT_EXCHANGE_RATE } from './constants'
+
 const HOLDINGS_KEY = 'mystock_holdings'
 const PRICES_CACHE_KEY = 'mystock_prices_cache'
 const TRANSACTIONS_KEY = 'mystock_transactions'
@@ -46,7 +48,7 @@ export const savePricesCache = (prices) => {
 }
 
 export const loadExchangeRate = () => {
-  try { const v = parseFloat(localStorage.getItem(EXCHANGE_RATE_KEY)); return v > 0 ? v : 3.7 } catch { return 3.7 }
+  try { const v = parseFloat(localStorage.getItem(EXCHANGE_RATE_KEY)); return v > 0 ? v : DEFAULT_EXCHANGE_RATE } catch { return DEFAULT_EXCHANGE_RATE }
 }
 
 export const saveExchangeRate = (rate) => {

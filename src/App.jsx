@@ -8,7 +8,8 @@ import {
   loadRecurring, saveRecurring,
   loadDisplayName, saveDisplayName,
   newId, toCSV, materializeRecurring,
-  getMarket, calculateHoldingMetrics, displaySymbol
+  getMarket, calculateHoldingMetrics, displaySymbol,
+  DEFAULT_EXCHANGE_RATE,
 } from './utils'
 
 import {
@@ -31,7 +32,7 @@ export default function App() {
   const holdingsRef = useRef(holdings)
   useEffect(() => { holdingsRef.current = holdings }, [holdings])
   const [prices, setPrices] = useState(() => loadPricesCache() ?? {})
-  const [exchangeRate, setExchangeRate] = useState(3.7)
+  const [exchangeRate, setExchangeRate] = useState(DEFAULT_EXCHANGE_RATE)
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
 

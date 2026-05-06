@@ -3,12 +3,13 @@ import { callGemini } from '../gemini'
 
 const MOCK_KEY = 'test-api-key'
 
-function mockFetch(responseBody, status = 200) {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => responseBody,
-    text: async () => JSON.stringify(responseBody),
+vi.mock('@google/generative-ai', () => ({ GoogleGenerativeAI: vi.fn() }))
+import { GoogleGenerativeAI } from '@google/generative-ai'
+
+function stubModel(model) {
+  // Must use `function` keyword so `new GoogleGenerativeAI()` works
+  GoogleGenerativeAI.mockImplementation(function () {
+    this.getGenerativeModel = () => model
   })
 }
 
@@ -28,25 +29,26 @@ describe('callGemini', () => {
   })
 
   it('returns text from a successful response', async () => {
-    const apiResponse = {
-      candidates: [{
-        content: { parts: [{ text: 'Your portfolio looks great!' }] },
-      }],
-    }
-    global.fetch = mockFetch(apiResponse)
+    const model = { generateContent: vi.fn().mockResolvedValue({ response: { text: () => 'Your portfolio looks great!' } }) }
+    stubModel(model)
 
     const result = await callGemini({ contents: [{ parts: [{ text: 'analyze this' }] }] })
     expect(result).toBe('Your portfolio looks great!')
   })
 
+  it('initializes the SDK with the correct API key', async () => {
+    const model = { generateContent: vi.fn().mockResolvedValue({ response: { text: () => '' } }) }
+    stubModel(model)
+
+    await callGemini({ contents: [] })
+    expect(GoogleGenerativeAI).toHaveBeenCalledWith(MOCK_KEY)
+  })
+
   it('parses JSON when isJson=true', async () => {
     const parsed = [{ amount: 50, category: 'Food', type: 'EXPENSE', currency: 'USD', note: 'lunch' }]
-    const apiResponse = {
-      candidates: [{
-        content: { parts: [{ text: '```json\n' + JSON.stringify(parsed) + '\n```' }] },
-      }],
-    }
-    global.fetch = mockFetch(apiResponse)
+    const text = '```json\n' + JSON.stringify(parsed) + '\n```'
+    const model = { generateContent: vi.fn().mockResolvedValue({ response: { text: () => text } }) }
+    stubModel(model)
 
     const result = await callGemini({ contents: [] }, true)
     expect(result).toEqual(parsed)
@@ -54,32 +56,24 @@ describe('callGemini', () => {
 
   it('strips bare code fences when parsing JSON', async () => {
     const parsed = { key: 'value' }
-    const apiResponse = {
-      candidates: [{
-        content: { parts: [{ text: '```\n' + JSON.stringify(parsed) + '\n```' }] },
-      }],
-    }
-    global.fetch = mockFetch(apiResponse)
+    const text = '```\n' + JSON.stringify(parsed) + '\n```'
+    const model = { generateContent: vi.fn().mockResolvedValue({ response: { text: () => text } }) }
+    stubModel(model)
 
     const result = await callGemini({ contents: [] }, true)
     expect(result).toEqual(parsed)
   })
 
   it('retries on failure and succeeds on second attempt', async () => {
-    const successResponse = {
-      candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-    }
     let calls = 0
-    global.fetch = vi.fn().mockImplementation(() => {
-      calls++
-      if (calls === 1) return Promise.reject(new Error('network error'))
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => successResponse,
-        text: async () => '',
-      })
-    })
+    const model = {
+      generateContent: vi.fn().mockImplementation(() => {
+        calls++
+        if (calls === 1) return Promise.reject(new Error('network error'))
+        return Promise.resolve({ response: { text: () => 'ok' } })
+      }),
+    }
+    stubModel(model)
 
     const result = await callGemini({ contents: [] })
     expect(result).toBe('ok')
@@ -87,33 +81,10 @@ describe('callGemini', () => {
   })
 
   it('throws after 3 failed attempts', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('always fails'))
+    const model = { generateContent: vi.fn().mockRejectedValue(new Error('always fails')) }
+    stubModel(model)
 
     await expect(callGemini({ contents: [] })).rejects.toThrow('always fails')
-    expect(global.fetch).toHaveBeenCalledTimes(3)
-  })
-
-  it('throws on non-ok HTTP response', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      text: async () => 'Rate limit exceeded',
-      json: async () => ({}),
-    })
-
-    await expect(callGemini({ contents: [] })).rejects.toThrow('Gemini 429')
-  })
-
-  it('includes the API key in the request URL', async () => {
-    const apiResponse = {
-      candidates: [{ content: { parts: [{ text: '' }] } }],
-    }
-    global.fetch = mockFetch(apiResponse)
-
-    await callGemini({ contents: [] })
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining(`key=${MOCK_KEY}`),
-      expect.any(Object),
-    )
+    expect(model.generateContent).toHaveBeenCalledTimes(3)
   })
 })

@@ -7,6 +7,8 @@ export const EXPENSE_CATEGORIES = Object.freeze([
   'Subscriptions', 'Insurance', 'Education', 'Travel', 'Shopping', 'Tax', 'Other',
 ])
 
+export const DEFAULT_EXCHANGE_RATE = 3.7
+
 export const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export const CATEGORY_EMOJI = {
@@ -26,7 +28,8 @@ export function categoryColor(name) {
 
 export function formatDateLabel(isoDate) {
   const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const yd = new Date(); yd.setDate(yd.getDate() - 1)
+  const yesterday = yd.toISOString().slice(0, 10)
   if (isoDate === today) return 'Today'
   if (isoDate === yesterday) return 'Yesterday'
   const [y, m, d] = isoDate.split('-').map(Number)
