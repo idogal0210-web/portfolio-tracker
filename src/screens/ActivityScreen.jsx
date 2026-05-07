@@ -57,25 +57,52 @@ export function ActivityScreen({
       paddingBottom: 'calc(env(safe-area-inset-bottom) + 128px)',
       paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
     }}>
-      <div className="px-5 pt-3 pb-2">
-        <div className="flex items-start justify-between">
+
+      {/* Header */}
+      <div style={{ padding: '12px 20px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div className="text-[26px] font-bold tracking-tight leading-none">CASHFLOW</div>
-            <div className="text-[13px] mt-0.5" style={{ color: '#71717a' }}>INCOME &amp; EXPENSES</div>
+            <div style={{ fontSize: '20px', fontWeight: 300, letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#fff' }}>
+              CASHFLOW
+            </div>
+            <div style={{ fontSize: '7px', letterSpacing: '0.3em', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', marginTop: '3px' }}>
+              Income &amp; Expenses
+            </div>
           </div>
-          <div className="flex items-center gap-2 pt-1">
-            <div className="relative">
-              <button onClick={() => setShowOverflow(v => !v)}
-                className="pressable w-8 h-8 rounded-xl border border-white/8 bg-white/4 flex items-center justify-center text-white/50 text-[16px] cursor-pointer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '4px' }}>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowOverflow(v => !v)}
+                className="pressable"
+                style={{
+                  width: '32px', height: '32px', borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.03)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'rgba(255,255,255,0.4)', fontSize: '16px', cursor: 'pointer',
+                }}
+              >
                 ⋯
               </button>
               {showOverflow && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowOverflow(false)} />
-                  <div className="absolute right-0 top-10 z-20 bg-[#1a1a1c] rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[160px]">
+                  <div style={{
+                    position: 'absolute', right: 0, top: '40px', zIndex: 20,
+                    background: '#1a1a1c', borderRadius: '16px',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                    overflow: 'hidden', minWidth: '160px',
+                  }}>
                     {[['Manage budgets', onOpenBudgets], ['Recurring', onOpenRecurring], ['Export CSV', onExportCsv]].map(([lbl, fn]) => (
                       <button key={lbl} onClick={() => { fn(); setShowOverflow(false) }}
-                        className="w-full px-4 py-3 text-left text-[13px] font-medium text-white/80 hover:bg-white/5 border-b border-white/5 border-x-0 border-t-0 last:border-0 bg-transparent cursor-pointer">
+                        style={{
+                          width: '100%', padding: '12px 16px', textAlign: 'left',
+                          fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.75)',
+                          background: 'transparent', border: 'none',
+                          borderBottom: '1px solid rgba(255,255,255,0.05)',
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}>
                         {lbl}
                       </button>
                     ))}
@@ -85,27 +112,53 @@ export function ActivityScreen({
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between mt-3">
-          <button onClick={prevMonth} className="pressable w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60 border-none cursor-pointer">
-            <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+
+        {/* Month selector */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginTop: '14px',
+          background: 'rgba(255,255,255,0.01)',
+          border: '1px solid rgba(255,255,255,0.03)',
+          borderRadius: '20px', padding: '10px 14px',
+        }}>
+          <button onClick={prevMonth} className="pressable" style={{
+            width: '30px', height: '30px', background: 'none', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255,255,255,0.3)',
+          }}>
+            <svg width="8" height="14" viewBox="0 0 10 18" fill="none">
+              <path d="M8 2L2 9l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <span className="text-[13px] font-bold tracking-widest uppercase" style={{ color: '#86efac' }}>
-            {MONTH_NAMES[viewMonth - 1]} {viewYear}
-          </span>
-          <button onClick={nextMonth} className="pressable w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/60 border-none cursor-pointer">
-            <svg width="8" height="14" viewBox="0 0 10 18" fill="none"><path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ fontSize: '7px', letterSpacing: '0.4em', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', marginBottom: '3px' }}>
+              Fiscal Period
+            </span>
+            <span style={{ fontSize: '10px', color: '#fff', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 300 }}>
+              {MONTH_NAMES[viewMonth - 1]} {viewYear}
+            </span>
+          </div>
+          <button onClick={nextMonth} className="pressable" style={{
+            width: '30px', height: '30px', background: 'none', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255,255,255,0.3)',
+          }}>
+            <svg width="8" height="14" viewBox="0 0 10 18" fill="none">
+              <path d="M2 2l6 7-6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
       </div>
 
+      {/* Sparkline */}
       {trend.some(t => t.net !== 0) && (
-        <div className="mx-5 mt-2">
-          <div className="glass-card-small p-4">
-            <div className="iq-label mb-2">6-month net flow</div>
+        <div style={{ margin: '0 20px 12px' }}>
+          <div className="glass-card-small" style={{ padding: '16px' }}>
+            <div className="iq-label" style={{ marginBottom: '8px' }}>6-month net flow</div>
             <MonthSparkline trend={trend} width={310} height={52} />
-            <div className="flex justify-between mt-1">
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
               {trend.map(p => (
-                <span key={`${p.year}-${p.month}`} className="text-[9px] text-white/30">
+                <span key={`${p.year}-${p.month}`} style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>
                   {MONTH_NAMES[p.month - 1]}
                 </span>
               ))}
@@ -114,17 +167,18 @@ export function ActivityScreen({
         </div>
       )}
 
-      <div className="mx-5 mt-3">
-        <div className="glass-card p-5">
-          <div className="grid grid-cols-3 gap-0">
+      {/* Totals card */}
+      <div style={{ margin: '0 20px 12px' }}>
+        <div className="glass-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0 }}>
             {[
               ['Income', totals.income, '#22c55e'],
               ['Expenses', totals.expenses, '#f43f5e'],
               ['Net', totals.net, netColor],
-            ].map(([lbl, val, clr]) => (
-              <div key={lbl} className={lbl !== 'Income' ? 'border-l border-white/5 pl-3' : ''}>
-                <div className="iq-label mb-1" style={lbl !== 'Net' ? { color: '#52525b' } : {}}>{lbl}</div>
-                <div className="text-[17px] font-bold tabular-nums tracking-tight" style={{ color: clr }}>
+            ].map(([lbl, val, clr], i) => (
+              <div key={lbl} style={i > 0 ? { borderLeft: '1px solid rgba(255,255,255,0.05)', paddingLeft: '12px' } : {}}>
+                <div className="iq-label" style={{ marginBottom: '4px', color: lbl !== 'Net' ? '#52525b' : undefined }}>{lbl}</div>
+                <div style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.5px', color: clr }}>
                   {lbl === 'Expenses' ? '−' : ''}{formatCurrency(Math.abs(val), currency)}
                 </div>
               </div>
@@ -134,14 +188,14 @@ export function ActivityScreen({
             const savingsRate = ((totals.income - Math.abs(totals.expenses)) / totals.income) * 100
             const srColor = savingsRate >= 20 ? '#22c55e' : savingsRate >= 0 ? '#f59e0b' : '#f43f5e'
             return (
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div className="iq-label mb-0.5" style={{ color: '#52525b' }}>Savings rate</div>
-                  <div className="text-[11px] text-white/35">
+                  <div className="iq-label" style={{ marginBottom: '2px', color: '#52525b' }}>Savings rate</div>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
                     {savingsRate >= 20 ? 'On track' : savingsRate >= 0 ? 'Could improve' : 'Over budget'}
                   </div>
                 </div>
-                <div className="text-[28px] font-bold tabular-nums tracking-tight" style={{ color: srColor }}>
+                <div style={{ fontSize: '28px', fontWeight: 700, letterSpacing: '-1px', color: srColor }}>
                   {savingsRate.toFixed(0)}%
                 </div>
               </div>
@@ -150,20 +204,26 @@ export function ActivityScreen({
         </div>
       </div>
 
+      {/* Category breakdown */}
       {catSlices.length > 0 && (
-        <div className="mx-5 mt-3">
-          <div className="glass-card-small p-4">
-            <div className="flex gap-1 p-1 rounded-xl bg-white/5 mb-3">
+        <div style={{ margin: '0 20px 12px' }}>
+          <div className="glass-card-small" style={{ padding: '16px' }}>
+            <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', marginBottom: '12px' }}>
               {['EXPENSE', 'INCOME'].map(t => (
-                <button key={t} onClick={() => setCatTab(t)}
-                  className="pressable flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors border-none cursor-pointer"
-                  style={catTab === t ? { background: 'rgba(134,239,172,0.15)', color: '#86efac' } : { color: 'rgba(255,255,255,0.35)', background: 'transparent' }}>
+                <button key={t} onClick={() => setCatTab(t)} className="pressable"
+                  style={{
+                    flex: 1, height: '32px', borderRadius: '10px',
+                    fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    background: catTab === t ? 'rgba(134,239,172,0.12)' : 'transparent',
+                    color: catTab === t ? '#86efac' : 'rgba(255,255,255,0.3)',
+                  }}>
                   {t === 'EXPENSE' ? 'Expenses' : 'Income'}
                 </button>
               ))}
             </div>
             <AllocationBar slices={catSlices.map((s, i) => ({ value: s.pct, color: catColors[i % catColors.length] }))} />
-            <div className="mt-3 space-y-2">
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {catSlices.map((s, i) => {
                 const budget = budgets.find(b => b.category === s.category && catTab === 'EXPENSE')
                 const progress = budget
@@ -171,25 +231,24 @@ export function ActivityScreen({
                   : null
                 return (
                   <div key={s.category}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: catColors[i % catColors.length] }} />
-                      <span className="text-[12px] font-semibold text-white/80 flex-1">{s.category}</span>
-                      <span className="text-[12px] text-white/50 tabular-nums">{s.pct.toFixed(0)}%</span>
-                      <span className="text-[12px] font-semibold text-white/80 tabular-nums">
-                        {formatCurrency(s.total, currency)}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: catColors[i % catColors.length], flexShrink: 0 }} />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.75)', flex: 1 }}>{s.category}</span>
+                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{s.pct.toFixed(0)}%</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>{formatCurrency(s.total, currency)}</span>
                     </div>
                     {progress && (
-                      <div className="ml-4 mt-1">
-                        <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{
+                      <div style={{ marginLeft: '16px', marginTop: '4px' }}>
+                        <div style={{ height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: '4px', transition: 'width 0.3s',
                             width: `${Math.min(progress.pct, 100)}%`,
                             background: progress.over ? '#f43f5e' : '#22c55e',
                           }} />
                         </div>
-                        <div className="text-[10px] text-white/35 mt-0.5 tabular-nums">
+                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
                           {formatCurrency(progress.spent, currency)} of {formatCurrency(progress.limit, currency)}
-                          {progress.over && <span className="text-rose-400"> · over budget</span>}
+                          {progress.over && <span style={{ color: '#f43f5e' }}> · over budget</span>}
                         </div>
                       </div>
                     )}
@@ -201,28 +260,68 @@ export function ActivityScreen({
         </div>
       )}
 
+      {/* Transaction list */}
       {grouped.length > 0 ? (
-        <div className="mx-5 mt-4 space-y-3 stagger">
+        <div style={{ margin: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px' }} className="stagger">
           {grouped.map(g => (
             <div key={g.date}>
-              <div className="iq-label mb-1.5 px-1" style={{ color: '#52525b' }}>
+              <div style={{
+                fontSize: '8px', fontWeight: 600, color: 'rgba(255,255,255,0.2)',
+                textTransform: 'uppercase', letterSpacing: '0.15em',
+                marginBottom: '8px', padding: '0 4px',
+              }}>
                 {formatDateLabel(g.date)}
               </div>
-              <div className="rounded-[22px] border border-white/5 bg-white/3 overflow-hidden divide-y divide-white/5">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {g.items.map(t => (
-                  <TransactionRow key={t.id} txn={t}
-                    displayCurrency={currency} exchangeRate={exchangeRate}
-                    onClick={() => onEditTxn(t)} />
+                  <button
+                    key={t.id}
+                    onClick={() => onEditTxn(t)}
+                    className="pressable"
+                    style={{
+                      width: '100%', textAlign: 'left',
+                      padding: '13px 15px', borderRadius: '18px',
+                      background: 'linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
+                      border: '1px solid rgba(255,255,255,0.03)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '13px' }}>
+                      <div style={{
+                        width: '2px', height: '24px', borderRadius: '2px', flexShrink: 0,
+                        background: t.type === 'INCOME' ? '#22c55e' : '#f43f5e',
+                      }} />
+                      <div>
+                        <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 500, letterSpacing: '0.03em' }}>
+                          {t.category}
+                        </div>
+                        <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.08em', marginTop: '2px' }}>
+                          {t.note || (t.type === 'INCOME' ? 'Income' : 'Expense')}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: '12px', fontWeight: 600, letterSpacing: '0.05em',
+                      color: t.type === 'INCOME' ? '#22c55e' : '#f43f5e',
+                    }}>
+                      {t.type === 'INCOME' ? '+' : '−'}{formatCurrency(t.amount, t.currency)}
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="mx-5 mt-8 p-6 rounded-[22px] border border-white/5 bg-white/3 text-center">
-          <div className="iq-label mb-2" style={{ color: '#52525b' }}>Activity</div>
-          <div className="text-[14px] font-light text-white/60">No transactions this month</div>
-          <div className="text-[12px] mt-1" style={{ color: '#52525b' }}>Tap + to add your first</div>
+        <div style={{
+          margin: '0 20px', marginTop: '32px', padding: '24px',
+          borderRadius: '22px', border: '1px solid rgba(255,255,255,0.05)',
+          background: 'rgba(255,255,255,0.02)', textAlign: 'center',
+        }}>
+          <div className="iq-label" style={{ color: '#52525b', marginBottom: '8px' }}>Activity</div>
+          <div style={{ fontSize: '14px', fontWeight: 300, color: 'rgba(255,255,255,0.5)' }}>No transactions this month</div>
+          <div style={{ fontSize: '12px', marginTop: '4px', color: '#52525b' }}>Tap + to add your first</div>
         </div>
       )}
     </div>
