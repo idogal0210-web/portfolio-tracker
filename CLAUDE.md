@@ -86,3 +86,14 @@ npm run lint       # ESLint check
 4. **LSB (Least Significant Bit)**: localStorage keys: `portfolio_holdings`, `portfolio_prices_cache`, `portfolio_exchange_rate`. No migrations yet; assume current schema.
 5. **Component Consolidation**: All UI is in `App.jsx` intentionally; no separate component files. Keep components tightly coupled to the single-file structure when adding features.
 
+## Copilot Skills
+
+### component-preview
+After every visual/UI change (add/modify component, update styles, layout changes):
+1. Generate standalone `preview.html` in project root
+2. Adapt React JSX to static HTML (`className` → `class`, remove event handlers)
+3. Use Tailwind CDN, dark background (`#0f0f0f`), centered component
+4. Open with `xdg-open preview.html`
+
+**Triggers:** Any work on `src/components/`, `src/App.jsx`, `src/index.css`, or styling changes
+
