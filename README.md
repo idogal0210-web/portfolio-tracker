@@ -182,8 +182,13 @@ npm run lint       # Run ESLint
 
 ```
 src/
-├── App.jsx           # Main component (all UI in one file)
-├── api.js            # Supabase & RapidAPI integrations
+├── components/       # Reusable UI features and elements
+├── screens/          # Main application screens
+├── hooks/            # Custom state and effect hooks
+├── App.jsx           # Main component (routing & layout)
+├── api.js            # API integrations
+├── dbService.js      # DB abstraction logic
+├── financeApi.js     # Finance market data logic
 ├── utils.js          # Core calculation logic
 ├── supabase.js       # Supabase client setup
 ├── index.css         # Tailwind + custom utilities

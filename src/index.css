@@ -201,3 +201,31 @@
 .stagger > *:nth-child(8)  { animation-delay: 315ms; }
 .stagger > *:nth-child(9)  { animation-delay: 360ms; }
 .stagger > *:nth-child(10) { animation-delay: 400ms; }
+
+/* ── Sheet Input Forms ───────────────────────────────────────────────────────── */
+.sheet-input {
+  width: 100%;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: white;
+  padding: 0 14px;
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.sheet-input::placeholder { color: rgba(255,255,255,0.2); }
+.sheet-input[type="date"] { color: rgba(255,255,255,0.85); font-size: 14px; min-height: 46px; }
+.sheet-input-date::-webkit-date-and-time-value { text-align: left; }
+.sheet-input-date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
+select.sheet-input {
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+select.sheet-input option { background: #1a1a1c; color: white; }
